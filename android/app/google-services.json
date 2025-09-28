@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "611717375598",
+    "project_id": "naihydro",
+    "storage_bucket": "naihydro.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:611717375598:android:4b6fa66f9b83d4a64de87f",
+        "android_client_info": {
+          "package_name": "com.example.naihydro"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDM0Qw4lqCuEoKYuuTiMCnLubddwwxsOnI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
