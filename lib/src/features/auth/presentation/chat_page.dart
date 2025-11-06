@@ -1,88 +1,109 @@
-// lib/src/features/chat/presentation/chat_page.dart
 import 'package:flutter/material.dart';
+import 'package:naihydro/src/features/auth/presentation/data/chat_service.dart';
 
-class ChatPage extends StatelessWidget {
-  final VoidCallback onClose;
+class ChatPage extends StatefulWidget {
+  const ChatPage({super.key});
 
-  const ChatPage({super.key, required this.onClose});
+  @override
+  State<ChatPage> createState() => _ChatPageState();
+}
+
+class _ChatPageState extends State<ChatPage> {
+  final TextEditingController _controller = TextEditingController();
+  final List<Map<String, String>> _messages = [];
+  bool _isLoading = false;
+
+  void _sendMessage() async {
+    final userMessage = _controller.text.trim();
+    if (userMessage.isEmpty) return;
+
+    setState(() {
+      _messages.add({"role": "user", "content": userMessage});
+      _isLoading = true;
+      _controller.clear();
+    });
+
+    try {
+      final reply = await ChatService.sendMessage(userMessage);
+      setState(() {
+        _messages.add({"role": "bot", "content": reply});
+      });
+    } catch (e) {
+      setState(() {
+        _messages.add({
+          "role": "bot",
+          "content": "Error connecting to NaiBot: $e",
+        });
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.bottomLeft,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        margin: const EdgeInsets.only(left: 20, bottom: 90),
-        padding: const EdgeInsets.all(12),
-        width: MediaQuery.of(context).size.width * 0.85,
-        height: MediaQuery.of(context).size.height * 0.5,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: const [
-            BoxShadow(
-              color: Colors.black26,
-              blurRadius: 12,
-              offset: Offset(0, 6),
-            )
-          ],
-        ),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Chat with NaiBot"),
+        backgroundColor: Colors.green,
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: _messages.length,
+              itemBuilder: (context, index) {
+                final msg = _messages[index];
+                final isUser = msg["role"] == "user";
+                return Align(
+                  alignment:
+                      isUser ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isUser ? Colors.green[200] : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      msg["content"]!,
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.all(8),
+              child: CircularProgressIndicator(color: Colors.green),
+            ),
+          SafeArea(
+            child: Row(
               children: [
-                const Text(
-                  "NaiBot Assistant",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.green,
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    decoration: const InputDecoration(
+                      hintText: "Ask NaiBot something...",
+                      contentPadding:
+                          EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.red),
-                  onPressed: onClose,
+                  onPressed: _isLoading ? null : _sendMessage,
+                  icon: const Icon(Icons.send, color: Colors.green),
                 ),
               ],
             ),
-            const Divider(),
-            const Expanded(
-              child: Center(
-                child: Text(
-                  "💬 Ask me about pH, nutrients, lighting,\nwater flow or pest control.",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.black54),
-                ),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  const Expanded(
-                    child: TextField(
-                      decoration: InputDecoration(
-                        hintText: "Type your question...",
-                        border: InputBorder.none,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.send, color: Colors.green),
-                    onPressed: () {
-                      // TODO: connect to NaiBot backend/AI later
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

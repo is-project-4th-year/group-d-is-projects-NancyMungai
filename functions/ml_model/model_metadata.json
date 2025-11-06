@@ -1,0 +1,80 @@
+{
+  "feature_cols": [
+    "pH",
+    "TDS",
+    "water_level",
+    "DHT_temp",
+    "DHT_humidity",
+    "pH_zscore",
+    "pH_percentile",
+    "pH_median_dist",
+    "TDS_zscore",
+    "TDS_percentile",
+    "TDS_median_dist",
+    "water_level_zscore",
+    "water_level_percentile",
+    "water_level_median_dist",
+    "DHT_temp_zscore",
+    "DHT_temp_percentile",
+    "DHT_temp_median_dist",
+    "DHT_humidity_zscore",
+    "DHT_humidity_percentile",
+    "DHT_humidity_median_dist",
+    "pH_TDS_product",
+    "pH_TDS_ratio",
+    "temp_humidity_product",
+    "temp_humidity_ratio",
+    "pH_squared",
+    "TDS_squared",
+    "total_zscore"
+  ],
+  "base_features": [
+    "pH",
+    "TDS",
+    "water_level",
+    "DHT_temp",
+    "DHT_humidity"
+  ],
+  "training_stats": {
+    "pH": {
+      "mean": 6.009403567228539,
+      "std": 0.5576946955767494,
+      "median": 5.8,
+      "q1": 5.63,
+      "q3": 6.69
+    },
+    "TDS": {
+      "mean": 1156.1403991545324,
+      "std": 248.556829469438,
+      "median": 1235.7,
+      "q1": 1020.9525,
+      "q3": 1331.4
+    },
+    "water_level": {
+      "mean": 1.2534594276754214,
+      "std": 0.4815373615524177,
+      "median": 1.0,
+      "q1": 1.0,
+      "q3": 2.0
+    },
+    "DHT_temp": {
+      "mean": 24.3522138377107,
+      "std": 1.5568375441169162,
+      "median": 24.4,
+      "q1": 23.6,
+      "q3": 25.1
+    },
+    "DHT_humidity": {
+      "mean": 71.66948647589182,
+      "std": 25.8701264771422,
+      "median": 71.7,
+      "q1": 67.5,
+      "q3": 77.4
+    }
+  },
+  "threshold": 0.45,
+  "ensemble_weights": {
+    "rf": 0.5,
+    "xgb": 0.5
+  }
+}
