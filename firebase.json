@@ -1,1 +1,28 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"naihydro","appId":"1:611717375598:android:4b6fa66f9b83d4a64de87f","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"naihydro","configurations":{"android":"1:611717375598:android:4b6fa66f9b83d4a64de87f","ios":"1:611717375598:ios:9f1205c98499929e4de87f","macos":"1:611717375598:ios:9f1205c98499929e4de87f","web":"1:611717375598:web:27f2c5953b15a35a4de87f","windows":"1:611717375598:web:2afbd53debd2b6f14de87f"}}}}}}
+{
+  "functions": [
+    {
+      "source": "functions/ml_model",
+      "runtime": "python310",
+      "region": "europe-west1",
+      "codebase": "ml_model",
+         "ignore": [
+        "venv",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "__pycache__",
+        "*.pyc",
+        "*.pyo",
+        ".pytest_cache",
+        ".coverage",
+        "htmlcov"
+      ]
+    },
+    {
+      "source": "functions/node_functions",
+      "runtime": "nodejs20",
+      "codebase": "node_functions"
+  
+    }
+  ]
+}
