@@ -2,12 +2,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:naihydro/src/features/auth/presentation/data/auth_service.dart';
-import 'package:naihydro/src/features/auth/presentation/home_page.dart';
 import 'features/auth/presentation/landing_page.dart';
 import 'features/auth/presentation/login_page.dart';
 import 'features/auth/presentation/signup_page.dart';
-
-
+import 'features/auth/presentation/home_page.dart';
 class NaiHydroApp extends StatelessWidget {
   const NaiHydroApp({super.key});
 
