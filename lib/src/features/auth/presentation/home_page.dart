@@ -8,7 +8,6 @@ import 'package:naihydro/src/features/auth/presentation/alerts_page.dart';
 import '../../common/widgets/alert_item.dart';
 import '../../common/widgets/status_card.dart';
 import '../../auth/presentation/chat_page.dart';
-// lib/src/features/auth/presentation/home_page.dart
 import '../presentation/data/farm_repository.dart';
 import '../presentation/models/farm_model.dart';
 import 'add_farm_page.dart';
