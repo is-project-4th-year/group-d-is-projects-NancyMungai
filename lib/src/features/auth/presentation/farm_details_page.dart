@@ -1,9 +1,11 @@
-// lib/src/features/home/presentation/farm_details_page.dart
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../presentation/data/farm_repository.dart';
 import '../presentation/models/farm_model.dart';
 import 'dart:async';
+import '../../common/widgets/bottom_nav.dart';
+import 'control_panel.dart';
 
 class FarmDetailsPage extends StatefulWidget {
   final FarmRepository repository;
@@ -405,6 +407,7 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
                   onTap: () {
                     // Navigate to controls
                   },
+                
                 ),
                 _buildActionButton(
                   icon: Icons.notifications,
@@ -548,7 +551,16 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
                 Navigator.of(context).pop();
               }),
               _buildNavItem(Icons.notifications, 'Alerts', false, () {}),
-              _buildNavItem(Icons.flash_on, 'Control', false, () {}),
+              _buildNavItem(Icons.flash_on, 'Control', false, () {Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ControlPanelPage(
+                      farm: widget.farm,
+                      repository: widget.repository,
+                    ),
+                  ),
+                );
+              }),
               _buildNavItem(Icons.bar_chart, 'Analytics', false, () {}),
             ],
           ),
