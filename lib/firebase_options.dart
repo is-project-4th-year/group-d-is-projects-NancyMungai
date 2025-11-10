@@ -48,6 +48,7 @@ class DefaultFirebaseOptions {
     authDomain: 'naihydro.firebaseapp.com',
     storageBucket: 'naihydro.firebasestorage.app',
     measurementId: 'G-43FNW8KRZ4',
+    databaseURL: 'https://naihydro-default-rtdb.europe-west1.firebasedatabase.app/',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
@@ -56,6 +57,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '611717375598',
     projectId: 'naihydro',
     storageBucket: 'naihydro.firebasestorage.app',
+    databaseURL: 'https://naihydro-default-rtdb.europe-west1.firebasedatabase.app/',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
@@ -65,6 +67,7 @@ class DefaultFirebaseOptions {
     projectId: 'naihydro',
     storageBucket: 'naihydro.firebasestorage.app',
     iosBundleId: 'com.example.naihydro',
+    databaseURL: 'https://naihydro-default-rtdb.europe-west1.firebasedatabase.app/',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -74,6 +77,7 @@ class DefaultFirebaseOptions {
     projectId: 'naihydro',
     storageBucket: 'naihydro.firebasestorage.app',
     iosBundleId: 'com.example.naihydro',
+    databaseURL: 'https://naihydro-default-rtdb.europe-west1.firebasedatabase.app/',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
@@ -84,5 +88,6 @@ class DefaultFirebaseOptions {
     authDomain: 'naihydro.firebaseapp.com',
     storageBucket: 'naihydro.firebasestorage.app',
     measurementId: 'G-GC1XV2V71D',
+    databaseURL: 'https://naihydro-default-rtdb.europe-west1.firebasedatabase.app/',
   );
 }
