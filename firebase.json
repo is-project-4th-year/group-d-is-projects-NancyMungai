@@ -23,6 +23,13 @@
       "runtime": "nodejs20",
       "codebase": "node_functions"
   
+    },
+
+{
+      "source": "functions/messaging",
+      "runtime": "nodejs20",
+      "codebase": "messaging",
+      "region": "europe-west1"
     }
   ]
 }

@@ -7,10 +7,6 @@ class NotificationService {
   late FirebaseMessaging _firebaseMessaging;
   late FirebaseDatabase _database;
   late FlutterLocalNotificationsPlugin _localNotifications;
-  
-  // Track last alerts to avoid spam
-  final Map<String, DateTime> _lastAlertTime = {};
-  static const Duration _alertDebounce = Duration(minutes: 5);
 
   factory NotificationService() {
     return _instance;
@@ -36,7 +32,7 @@ class NotificationService {
       // Initialize local notifications with channel
       await _initializeLocalNotifications();
 
-      // Get FCM Token and save it
+      // Get FCM Token
       String? fcmToken = await _firebaseMessaging.getToken();
       
       if (fcmToken != null) {
@@ -45,7 +41,7 @@ class NotificationService {
         print('   FCM Token: ${fcmToken.substring(0, 20)}...');
         print('   User ID: $userId');
         
-        // Save FCM token to multiple locations
+        // Save FCM token
         await _saveFcmTokenDirectly(deviceId, userId, fcmToken);
       } else {
         print('❌ Failed to get FCM token');
@@ -54,12 +50,13 @@ class NotificationService {
       // Set up message handlers BEFORE listening
       _setupMessageHandlers();
 
-      // Listen to real-time processed data changes for specific alerts
-      _listenToSensorData(deviceId);
+      // Listen to real-time processed data changes
+      _listenToProcessedData(deviceId);
 
       // Listen to token refresh
       listenToTokenRefresh(deviceId, userId);
 
+      print('✅ Local notifications initialized');
       print('✅ Notification Service initialized successfully');
       print('============================================================');
       print('✅ Notifications initialized for device: $deviceId');
@@ -86,9 +83,11 @@ class NotificationService {
   Future<void> _initializeLocalNotifications() async {
     print('\n🔧 Initializing local notifications...');
     
+    // Android setup with notification channel
     const AndroidInitializationSettings androidInit =
         AndroidInitializationSettings('@mipmap/ic_launcher');
     
+    // iOS setup
     const DarwinInitializationSettings iosInit = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
@@ -102,6 +101,7 @@ class NotificationService {
 
     await _localNotifications.initialize(initSettings);
     
+    // Create notification channel for Android
     await _createNotificationChannel();
     
     print('   ✅ Local notifications initialized');
@@ -111,8 +111,8 @@ class NotificationService {
     print('   Creating notification channel...');
     
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
-      'naihydro_alerts',
-      'Farm Alerts',
+      'naihydro_alerts', // ID
+      'Farm Alerts', // title
       description: 'Notifications for farm sensor alerts and ML predictions',
       importance: Importance.high,
       enableVibration: true,
@@ -144,6 +144,7 @@ class NotificationService {
       await _database.ref('users/$userId/devices/$deviceId/fcmToken').set(fcmToken);
       print('   ✅ Saved to /users/$userId/devices/$deviceId/fcmToken');
 
+      // Update timestamp
       await _database.ref('devices/$deviceId/fcmTokenUpdated').set(DateTime.now().toIso8601String());
       
       print('   ✅ FCM token saved successfully');
@@ -155,10 +156,11 @@ class NotificationService {
   void _setupMessageHandlers() {
     print('\n🎧 Setting up message handlers...');
     
+    // Handle background messages
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     print('   ✅ Background handler registered');
 
-    // Handle FOREGROUND messages
+    // Handle FOREGROUND messages (when app is open)
     FirebaseMessaging.onMessage.listen(
       (RemoteMessage message) {
         print('   🔔 FOREGROUND FCM message received!');
@@ -166,6 +168,7 @@ class NotificationService {
         print('      Body: ${message.notification?.body}');
         print('      Data: ${message.data}');
         
+        // IMPORTANT: Show notification even when app is in foreground
         _handleMessage(message);
       },
       onError: (error) {
@@ -187,17 +190,17 @@ class NotificationService {
     print('   ✅ Message handlers registered');
   }
 
-  void _listenToSensorData(String deviceId) {
-    print('\n👂 Setting up sensor data listeners...');
+  void _listenToProcessedData(String deviceId) {
+    print('\n👂 Setting up data listeners...');
     print('   Listening to /processed/$deviceId/');
     
     _database.ref('processed/$deviceId').onValue.listen(
       (DatabaseEvent event) {
         if (event.snapshot.exists) {
           final data = event.snapshot.value;
-          if (data != null && data is Map<dynamic, dynamic>) {
+          if (data != null) {
             print('   ✅ Processed data changed');
-            _checkAndNotifyForSpecificAlerts(deviceId, data);
+            _checkAndNotifyForAnomalies(deviceId, data);
           }
         }
       },
@@ -207,169 +210,36 @@ class NotificationService {
     );
   }
 
-  void _checkAndNotifyForSpecificAlerts(String deviceId, Map<dynamic, dynamic> dataMap) {
+  void _checkAndNotifyForAnomalies(String deviceId, dynamic data) {
     try {
-      final data = Map<String, dynamic>.from(dataMap);
+      if (data is! Map<dynamic, dynamic>) return;
 
-      // Parse sensor values
-      final waterLevel = _parseDouble(data['water_level']);
-      final tds = _parseDouble(data['TDS']);
-      final ph = _parseDouble(data['pH']);
-      final temp = _parseDouble(data['DHT_temp']);
-      final humidity = _parseDouble(data['DHT_humidity']);
-      final pumpState = data['pump_state'];
+      final dataMap = data as Map<dynamic, dynamic>;
 
-      print('\n🔍 Checking sensor thresholds:');
-      print('   Water: ${waterLevel}L | TDS: ${tds}ppm | pH: ${ph}');
-      print('   Temp: ${temp}°C | Humidity: ${humidity}% | Pump: ${pumpState}');
-
-      // ========== CRITICAL WATER LEVEL ==========
-      if (waterLevel > 0 && waterLevel < 10) {
-        _sendDebounceAlert(
-          deviceId,
-          'water_critical',
-          '🚨 CRITICAL: Water Level Very Low',
-          'Water level: ${waterLevel.toStringAsFixed(1)}L - Fill tank immediately!',
-        );
-      } else if (waterLevel > 0 && waterLevel < 20) {
-        _sendDebounceAlert(
-          deviceId,
-          'water_low',
-          '⚠️ WARNING: Water Level Low',
-          'Water level: ${waterLevel.toStringAsFixed(1)}L - Refill soon',
-        );
+      // Check prediction
+      if (dataMap.containsKey('prediction')) {
+        final prediction = dataMap['prediction'];
+        if (prediction == 1) {
+          print('   🚨 ML Alert detected from DB listener');
+          _showNotification(
+            '🚨 Critical Alert',
+            'ML model detected potential issues',
+            'ml_alert',
+          );
+        }
       }
 
-      // ========== NUTRIENTS (TDS) ==========
-      if (tds > 0 && tds < 400) {
-        _sendDebounceAlert(
-          deviceId,
-          'tds_low',
-          '🌱 NUTRIENT ALERT: TDS Too Low',
-          'TDS: ${tds.toStringAsFixed(0)}ppm - Nutrients are low, add fertilizer',
-        );
-      } else if (tds > 0 && tds > 2000) {
-        _sendDebounceAlert(
-          deviceId,
-          'tds_high',
-          '🔴 NUTRIENT ALERT: TDS Too High',
-          'TDS: ${tds.toStringAsFixed(0)}ppm - Solution too concentrated, dilute',
+      // Check pump/relay
+      if (dataMap.containsKey('pump_state')) {
+        _showNotification(
+          '💧 Pump',
+          'Pump turned ${dataMap['pump_state'] == 1 ? "ON" : "OFF"}',
+          'pump_change',
         );
       }
-
-      // ========== pH LEVEL ==========
-      if (ph > 0 && ph < 5.5) {
-        _sendDebounceAlert(
-          deviceId,
-          'ph_too_low',
-          '🔴 pH ALERT: Too Acidic',
-          'pH: ${ph.toStringAsFixed(1)} - Solution too acidic, add base',
-        );
-      } else if (ph > 0 && ph > 8.5) {
-        _sendDebounceAlert(
-          deviceId,
-          'ph_too_high',
-          '🔴 pH ALERT: Too Alkaline',
-          'pH: ${ph.toStringAsFixed(1)} - Solution too alkaline, add acid',
-        );
-      } else if (ph > 0 && (ph < 6.0 || ph > 8.0)) {
-        _sendDebounceAlert(
-          deviceId,
-          'ph_warning',
-          '⚠️ pH WARNING: Out of Range',
-          'pH: ${ph.toStringAsFixed(1)} - Optimal range: 6.0-8.0',
-        );
-      }
-
-      // ========== TEMPERATURE ==========
-      if (temp > -100 && temp < 15) {
-        _sendDebounceAlert(
-          deviceId,
-          'temp_too_low',
-          '❄️ TEMPERATURE ALERT: Too Cold',
-          'Temperature: ${temp.toStringAsFixed(1)}°C - Heat your grow area',
-        );
-      } else if (temp > -100 && temp > 32) {
-        _sendDebounceAlert(
-          deviceId,
-          'temp_too_high',
-          '🔥 TEMPERATURE ALERT: Too Hot',
-          'Temperature: ${temp.toStringAsFixed(1)}°C - Cool your grow area or improve ventilation',
-        );
-      } else if (temp > -100 && (temp < 18 || temp > 28)) {
-        _sendDebounceAlert(
-          deviceId,
-          'temp_warning',
-          '🌡️ TEMPERATURE WARNING: Out of Range',
-          'Temperature: ${temp.toStringAsFixed(1)}°C - Optimal range: 18-28°C',
-        );
-      }
-
-      // ========== HUMIDITY ==========
-      if (humidity > 0 && humidity < 40) {
-        _sendDebounceAlert(
-          deviceId,
-          'humidity_low',
-          '💧 HUMIDITY ALERT: Too Low',
-          'Humidity: ${humidity.toStringAsFixed(0)}% - Increase moisture in grow area',
-        );
-      } else if (humidity > 0 && humidity > 80) {
-        _sendDebounceAlert(
-          deviceId,
-          'humidity_high',
-          '💨 HUMIDITY ALERT: Too High',
-          'Humidity: ${humidity.toStringAsFixed(0)}% - Improve air circulation',
-        );
-      }
-
-      // ========== PUMP STATE CHANGES ==========
-      _checkPumpState(deviceId, pumpState);
-
     } catch (e) {
       print('   ❌ Error checking anomalies: $e');
     }
-  }
-
-  void _checkPumpState(String deviceId, dynamic pumpState) {
-    if (pumpState == null) return;
-
-    final state = pumpState is int ? pumpState : (pumpState == true ? 1 : 0);
-    
-    if (state == 1) {
-      _sendDebounceAlert(
-        deviceId,
-        'pump_on',
-        '💧 Pump Status',
-        'Water pump is now ON',
-      );
-    } else if (state == 0) {
-      _sendDebounceAlert(
-        deviceId,
-        'pump_off',
-        '💧 Pump Status',
-        'Water pump is now OFF',
-      );
-    }
-  }
-
-  void _sendDebounceAlert(
-    String deviceId,
-    String alertType,
-    String title,
-    String body,
-  ) {
-    final key = '$deviceId:$alertType';
-    final now = DateTime.now();
-    final lastTime = _lastAlertTime[key];
-
-    // Skip if alert was sent recently (debounce)
-    if (lastTime != null && now.difference(lastTime) < _alertDebounce) {
-      print('   ⏭️  Skipping duplicate alert (debounced): $alertType');
-      return;
-    }
-
-    _lastAlertTime[key] = now;
-    _showNotification(title, body, alertType);
   }
 
   Future<void> _showNotification(
@@ -393,6 +263,7 @@ class NotificationService {
         showWhen: true,
         enableVibration: true,
         playSound: true,
+        // Remove sound reference - use channel default
       );
 
       const DarwinNotificationDetails iosDetails =
@@ -407,6 +278,7 @@ class NotificationService {
         iOS: iosDetails,
       );
 
+      // Use unique ID based on timestamp to avoid duplicates
       final notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
       await _localNotifications.show(
@@ -420,6 +292,8 @@ class NotificationService {
       print('   ✅ Notification displayed successfully');
     } catch (e) {
       print('   ❌ Error showing notification: $e');
+      print('   📋 Exception type: ${e.runtimeType}');
+      print('   📋 Exception: ${e.toString()}');
     }
   }
 
@@ -434,6 +308,11 @@ class NotificationService {
         message.notification!.body ?? 'New notification',
         message.data['type'] ?? 'unknown',
       );
+    } else {
+      print('   ⚠️ Message has no notification payload');
+      if (message.data.isNotEmpty) {
+        print('   Data: ${message.data}');
+      }
     }
   }
 
@@ -451,27 +330,23 @@ class NotificationService {
       },
     );
   }
-
-  // Helper to safely parse doubles
-  double _parseDouble(dynamic value) {
-    if (value == null) return -1;
-    if (value is double) return value;
-    if (value is int) return value.toDouble();
-    if (value is String) {
-      try {
-        return double.parse(value);
-      } catch (e) {
-        return -1;
-      }
-    }
-    return -1;
-  }
 }
 
+/// Background message handler (must be a top-level function)
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   print('🔔 BACKGROUND MESSAGE RECEIVED');
   print('   Message ID: ${message.messageId}');
   print('   Title: ${message.notification?.title}');
   print('   Body: ${message.notification?.body}');
+  
+  // You can initialize Firebase and database here if needed
+}
+
+class TimeoutException implements Exception {
+  final String message;
+  TimeoutException(this.message);
+
+  @override
+  String toString() => message;
 }
