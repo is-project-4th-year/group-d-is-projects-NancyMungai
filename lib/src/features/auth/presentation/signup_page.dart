@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:naihydro/src/features/auth/presentation/data/auth_service.dart';
+import 'package:naihydro/src/features/auth/presentation/login_page.dart';
 import '../../common/widgets/primary_button.dart';
 
 class SignupPage extends StatefulWidget {
@@ -18,12 +19,15 @@ class SignupPage extends StatefulWidget {
 }
 
 class _SignupPageState extends State<SignupPage> {
+  final _formKey = GlobalKey<FormState>();
+
   final emailCtrl = TextEditingController();
   final passCtrl = TextEditingController();
   final confirmCtrl = TextEditingController();
   final farmCtrl = TextEditingController();
   final auth = AuthService();
   String error = "";
+  bool loading = false;
 
   @override
   void dispose() {
@@ -35,17 +39,39 @@ class _SignupPageState extends State<SignupPage> {
   }
 
   Future<void> _onSignUp() async {
+      if (!_formKey.currentState!.validate()) return;
+
+    setState(() {
+      error = "";
+      loading = true;
+    });
+
     if (passCtrl.text != confirmCtrl.text) {
-      setState(() => error = "Passwords do not match");
+      setState(() {
+        error = "Passwords do not match";
+        loading = false;
+      });
       return;
     }
     try {
       await auth.signUp(emailCtrl.text.trim(), passCtrl.text.trim());
       widget.onSuccess();
     } catch (e) {
-      setState(() => error = e.toString());
+  String message = 'Signup failed. Please try again.';
+  if (e.toString().contains('email-already-in-use')) {
+    message = 'This email is already registered.';
+  } else if (e.toString().contains('invalid-email')) {
+    message = 'Invalid email format.';
+  } else if (e.toString().contains('weak-password')) {
+    message = 'Password is too weak.';
+  }
+  setState(() => error = message);
+}finally {
+      if (mounted) setState(() => loading = false);
     }
   }
+
+  
 
   @override
   Widget build(BuildContext context) {
@@ -122,6 +148,9 @@ class _SignupPageState extends State<SignupPage> {
                 elevation: 6,
                 child: Padding(
                   padding: const EdgeInsets.all(20),
+                   child: Form(
+                    key: _formKey,
+                    autovalidateMode: AutovalidateMode.onUserInteraction,
                   child: Column(
                     children: [
                       Text(
@@ -141,47 +170,73 @@ class _SignupPageState extends State<SignupPage> {
                         style: GoogleFonts.poppins(color: Colors.grey[600]),
                       ),
                       const SizedBox(height: 20),
-                      TextField(
-                        controller: farmCtrl,
-                        decoration: InputDecoration(
-                          labelText: "Farm Name",
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
+                  TextFormField(
+  controller: farmCtrl,
+  decoration: InputDecoration(
+    labelText: "Username",
+    prefixIcon: const Icon(Icons.agriculture_outlined),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+  ),
+      validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Please enter your farm name';
+                            }
+                            if (value.length < 2) {
+                              return 'Farm name must be at least 2 characters';
+                            }
+                            return null;
+                          },
+),
+
                       const SizedBox(height: 16),
-                      TextField(
-                        controller: emailCtrl,
-                        decoration: InputDecoration(
-                          labelText: "Email",
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
+                    TextFormField(
+  controller: emailCtrl,
+  keyboardType: TextInputType.emailAddress,
+  decoration: InputDecoration(
+    labelText: "Email",
+    prefixIcon: const Icon(Icons.email_outlined),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+  ),
+  validator: (value) {
+    if (value == null || value.isEmpty) return 'Please enter your email';
+    final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
+    if (!emailRegex.hasMatch(value)) return 'Enter a valid email address';
+    return null;
+  },
+),
+
                       const SizedBox(height: 16),
-                      TextField(
-                        controller: passCtrl,
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          labelText: "Password",
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
+                     TextFormField(
+  controller: passCtrl,
+  obscureText: true,
+  decoration: InputDecoration(
+    labelText: "Password",
+    prefixIcon: const Icon(Icons.lock_outline),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+  ),
+  validator: (value) {
+    if (value == null || value.isEmpty) return 'Please enter a password';
+    if (value.length < 6) return 'Password must be at least 6 characters';
+    return null;
+  },
+),
+
                       const SizedBox(height: 16),
-                      TextField(
-                        controller: confirmCtrl,
-                        obscureText: true,
-                        decoration: InputDecoration(
-                          labelText: "Confirm Password",
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
+                    TextFormField(
+  controller: confirmCtrl,
+  obscureText: true,
+  decoration: InputDecoration(
+    labelText: "Confirm Password",
+    prefixIcon: const Icon(Icons.lock_outline),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+  ),
+  validator: (value) {
+    if (value == null || value.isEmpty) return 'Please confirm your password';
+    if (value != passCtrl.text) return 'Passwords do not match';
+    return null;
+  },
+),
+
                       const SizedBox(height: 20),
                       PrimaryButton(
                         label: "Create Account",
@@ -194,13 +249,23 @@ class _SignupPageState extends State<SignupPage> {
                               style: const TextStyle(color: Colors.red)),
                         ),
                       const SizedBox(height: 16),
-                      TextButton(
-                        onPressed: () {
-                          // navigate to login
-                        },
-                        child: const Text("Already have an account? Sign in"),
-                      ),
-                    ],
+                    TextButton(
+  onPressed: () {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => LoginPage(
+          authService: AuthService(),
+          onSuccess: widget.onSuccess,
+          onBack: () => Navigator.pop(context),
+        ),
+      ),
+    );
+  },
+  child: const Text("Already have an account? Sign in"),
+   ),
+                      ],
+                    ),
                   ),
                 ),
               ),

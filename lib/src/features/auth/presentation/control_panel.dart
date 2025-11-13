@@ -55,16 +55,25 @@ class _ControlPanelPageState extends State<ControlPanelPage> {
         '${_capitalize(controlName)} turned ${newState ? "ON" : "OFF"}',
         isError: false,
       );
-    } catch (e) {
-      // Revert the toggle on error
-      setState(() {
-        if (controlName == 'pump_state') pumpOn = !newState;
-        if (controlName == 'lights') lightsOn = !newState;
-        if (controlName == 'fan') fanOn = !newState;
-      });
+ } catch (e) {
+  String friendlyMessage = 'Something went wrong. Please try again.';
+  
+  if (e.toString().contains('permission-denied')) {
+    friendlyMessage = 'You don’t have permission to control this device. Please check your account or device link.';
+  } else if (e.toString().contains('network')) {
+    friendlyMessage = 'No internet connection. Please check your network.';
+  }
 
-      _showSnackBar('Failed to update $controlName: $e', isError: true);
-    } finally {
+  // revert toggle
+  setState(() {
+    if (controlName == 'pump_state') pumpOn = !newState;
+    if (controlName == 'lights') lightsOn = !newState;
+    if (controlName == 'fan') fanOn = !newState;
+  });
+
+  _showSnackBar(friendlyMessage, isError: true);
+}
+finally {
       setState(() => _isLoading = false);
     }
   }
