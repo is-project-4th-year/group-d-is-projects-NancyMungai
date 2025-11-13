@@ -6,6 +6,8 @@ import '../presentation/models/farm_model.dart';
 import 'dart:async';
 import '../../common/widgets/bottom_nav.dart';
 import 'control_panel.dart';
+import 'package:naihydro/src/features/auth/presentation/dashboard_page.dart';
+import 'package:naihydro/src/features/auth/presentation/alerts_page.dart';
 
 class FarmDetailsPage extends StatefulWidget {
   final FarmRepository repository;
@@ -550,7 +552,16 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
               _buildNavItem(Icons.home, 'Home', true, () {
                 Navigator.of(context).pop();
               }),
-              _buildNavItem(Icons.notifications, 'Alerts', false, () {}),
+                  _buildNavItem(Icons.notifications, 'Alerts', false, () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => AlertsPage(
+                   
+                  ),
+                ),
+              );
+            }),
               _buildNavItem(Icons.flash_on, 'Control', false, () {Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -561,7 +572,16 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
                   ),
                 );
               }),
-              _buildNavItem(Icons.bar_chart, 'Analytics', false, () {}),
+              _buildNavItem(Icons.bar_chart, 'Analytics', false, () {
+
+             Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => DashboardPage(
+ ),
+                ),
+              );
+            }),
             ],
           ),
         ),
