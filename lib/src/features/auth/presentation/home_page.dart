@@ -62,12 +62,54 @@ class _HomePageState extends State<HomePage> {
       ),
       body: StreamBuilder<List<FarmModel>>(
         stream: _farmsStream,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final farms = snapshot.data ?? [];
+        builder: (context, snapshot)
+        {
+        print('StreamBuilder state: ${snapshot.connectionState}');
+        print('Has data: ${snapshot.hasData}');
+        print('Has error: ${snapshot.hasError}');
+        
+        // Handle errors
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error, color: Colors.red, size: 48),
+                  const SizedBox(height: 16),
+                  Text('Error loading farms: ${snapshot.error}'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _farmsStream = _repo.getFarmsStream();
+                      });
+                    },
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        
+         
+           // Handle loading
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('Loading farms...'),
+              ],
+            ),
+          );
+        }
 
+        final farms = snapshot.data ?? [];
           if (farms.isEmpty) {
             return Center(
               child: Padding(
