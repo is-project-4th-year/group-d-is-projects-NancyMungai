@@ -1,6 +1,7 @@
 {
   "project_info": {
     "project_number": "611717375598",
+    "firebase_url": "https://naihydro-default-rtdb.europe-west1.firebasedatabase.app",
     "project_id": "naihydro",
     "storage_bucket": "naihydro.firebasestorage.app"
   },
