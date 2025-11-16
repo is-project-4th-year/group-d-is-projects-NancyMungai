@@ -1,9 +1,21 @@
 // lib/src/features/home/presentation/pages/control_panel.dart
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:ui'; // Needed for BackdropFilter (Glassmorphism)
 
 import '../presentation/data/farm_repository.dart';
 import '../presentation/models/farm_model.dart';
+import 'package:naihydro/src/features/auth/presentation/dashboard_page.dart';
+import 'package:naihydro/src/features/auth/presentation/alerts_page.dart';
+import 'farm_details_page.dart';
+
+// --- CUSTOM THEME COLORS & CONSTANTS ---
+const Color kPrimaryGreen = Color(0xFF558B2F);
+const Color kAccentGreen = Color(0xFF8BC34A);
+const Color kBackgroundColor = Color(0xFFC7CEC8);
+const Color kCardColor = Colors.white10;
+const Color kDarkText = Color(0xFF37474F);
+const Color kLightText = Colors.white;
 
 class ControlPanelPage extends StatefulWidget {
   final FarmModel farm;
@@ -40,7 +52,7 @@ class _ControlPanelPageState extends State<ControlPanelPage> {
         widget.farm.id,
         controlName,
         newState,
-        widget.farm.deviceId, // ✅ Pass the device ID
+        widget.farm.deviceId,
       );
 
       // Update local UI state
@@ -55,25 +67,24 @@ class _ControlPanelPageState extends State<ControlPanelPage> {
         '${_capitalize(controlName)} turned ${newState ? "ON" : "OFF"}',
         isError: false,
       );
- } catch (e) {
-  String friendlyMessage = 'Something went wrong. Please try again.';
-  
-  if (e.toString().contains('permission-denied')) {
-    friendlyMessage = 'You don’t have permission to control this device. Please check your account or device link.';
-  } else if (e.toString().contains('network')) {
-    friendlyMessage = 'No internet connection. Please check your network.';
-  }
+    } catch (e) {
+      String friendlyMessage = 'Something went wrong. Please try again.';
 
-  // revert toggle
-  setState(() {
-    if (controlName == 'pump_state') pumpOn = !newState;
-    if (controlName == 'lights') lightsOn = !newState;
-    if (controlName == 'fan') fanOn = !newState;
-  });
+      if (e.toString().contains('permission-denied')) {
+        friendlyMessage = 'You don\'t have permission to control this device. Please check your account or device link.';
+      } else if (e.toString().contains('network')) {
+        friendlyMessage = 'No internet connection. Please check your network.';
+      }
 
-  _showSnackBar(friendlyMessage, isError: true);
-}
-finally {
+      // revert toggle
+      setState(() {
+        if (controlName == 'pump_state') pumpOn = !newState;
+        if (controlName == 'lights') lightsOn = !newState;
+        if (controlName == 'fan') fanOn = !newState;
+      });
+
+      _showSnackBar(friendlyMessage, isError: true);
+    } finally {
       setState(() => _isLoading = false);
     }
   }
@@ -93,167 +104,241 @@ finally {
     return s[0].toUpperCase() + s.substring(1).replaceAll('_', ' ');
   }
 
+  Widget _buildGlassCard({required Widget child, EdgeInsetsGeometry? padding}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        child: Container(
+          padding: padding ?? const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: kCardColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.3),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          'Control Panel',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: BoxDecoration(
+          color: kBackgroundColor,
+          image: const DecorationImage(
+            image: AssetImage('assets/images/detailspg.jpeg'),
+            fit: BoxFit.cover,
+          ),
         ),
-        backgroundColor: const Color(0xFF22c55e),
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Farm Info Header
+            // Header
             Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF22c55e).withOpacity(0.1),
-                    const Color(0xFF16a34a).withOpacity(0.05),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF22c55e), width: 1),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.farm.name,
-                    style: GoogleFonts.poppins(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: const Color(0xFF22c55e),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.location_on,
-                          size: 14, color: Colors.grey[600]),
-                      const SizedBox(width: 4),
-                      Text(
-                        widget.farm.location,
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Warning if no device ID
-            if (widget.farm.deviceId == null)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.orange[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange[300]!, width: 1),
-                ),
-                child: Row(
+              color: Colors.transparent,
+              child: SafeArea(
+                bottom: false,
+                child: Column(
                   children: [
-                    Icon(Icons.warning, color: Colors.orange[600], size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'No device linked to this farm. Controls disabled.',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          color: Colors.orange[800],
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 16, 16, 8),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.arrow_back, color: kDarkText),
+                            onPressed: () => Navigator.of(context).pop(),
+                          ),
+                          Icon(Icons.flash_on, color: kPrimaryGreen, size: 32),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Control Panel',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                                Row(
+                                  children: [
+                                    Icon(Icons.location_on, size: 12, color: Colors.white70),
+                                    SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        widget.farm.location,
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 12,
+                                          color: Colors.white70,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Farm Info Header
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: _buildGlassCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.farm.name,
+                              style: GoogleFonts.poppins(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: kPrimaryGreen,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Icon(Icons.location_on,
+                                    size: 14, color: Colors.white70),
+                                const SizedBox(width: 4),
+                                Text(
+                                  widget.farm.location,
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                     ),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
-            if (widget.farm.deviceId == null) const SizedBox(height: 16),
-
-            // Controls Header
-            Text(
-              'Device Controls',
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
-              ),
             ),
-            const SizedBox(height: 16),
 
-            // Water Pump Control
-            _buildControlCard(
-              title: 'Water Pump',
-              icon: Icons.water_drop,
-              isOn: pumpOn,
-              onToggle: (value) =>
-                  _toggleControl('pump_state', value),
-              isLoading: _isLoading,
-              description: 'Control the water pump relay',
-              isEnabled: widget.farm.deviceId != null,
-            ),
-            const SizedBox(height: 12),
+            // Content
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Warning if no device ID
+                    if (widget.farm.deviceId == null)
+                      _buildGlassCard(
+                        child: Row(
+                          children: [
+                            Icon(Icons.warning, color: Colors.orange[400], size: 20),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'No device linked to this farm. Controls disabled.',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (widget.farm.deviceId == null) const SizedBox(height: 16),
 
-            // Grow Lights Control
-            _buildControlCard(
-              title: 'Grow Lights',
-              icon: Icons.light_mode,
-              isOn: lightsOn,
-              onToggle: (value) =>
-                  _toggleControl('lights', value),
-              isLoading: _isLoading,
-              description: 'Control the lighting system',
-              isEnabled: widget.farm.deviceId != null,
-            ),
-            const SizedBox(height: 12),
-
-            // Fan Control
-            _buildControlCard(
-              title: 'Fan',
-              icon: Icons.air,
-              isOn: fanOn,
-              onToggle: (value) =>
-                  _toggleControl('fan', value),
-              isLoading: _isLoading,
-              description: 'Control the ventilation fan',
-              isEnabled: widget.farm.deviceId != null,
-            ),
-            const SizedBox(height: 24),
-
-            // Info Section
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue[200]!, width: 1),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info, color: Colors.blue[600], size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Device ID: ${widget.farm.deviceId ?? "Not configured"}',
+                    // Controls Header
+                    Text(
+                      'Device Controls',
                       style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        color: Colors.blue[800],
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white70,
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+
+                    // Water Pump Control
+                    _buildControlCard(
+                      title: 'Water Pump',
+                      icon: Icons.water_drop,
+                      isOn: pumpOn,
+                      onToggle: (value) => _toggleControl('pump_state', value),
+                      isLoading: _isLoading,
+                      description: 'Control the water pump relay',
+                      isEnabled: widget.farm.deviceId != null,
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Grow Lights Control
+                    _buildControlCard(
+                      title: 'Grow Lights',
+                      icon: Icons.light_mode,
+                      isOn: lightsOn,
+                      onToggle: (value) => _toggleControl('lights', value),
+                      isLoading: _isLoading,
+                      description: 'Control the lighting system',
+                      isEnabled: widget.farm.deviceId != null,
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Fan Control
+                    _buildControlCard(
+                      title: 'Fan',
+                      icon: Icons.air,
+                      isOn: fanOn,
+                      onToggle: (value) => _toggleControl('fan', value),
+                      isLoading: _isLoading,
+                      description: 'Control the ventilation fan',
+                      isEnabled: widget.farm.deviceId != null,
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Info Section
+                    _buildGlassCard(
+                      child: Row(
+                        children: [
+                          Icon(Icons.info, color: kAccentGreen, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Device ID: ${widget.farm.deviceId ?? "Not configured"}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 80),
+                  ],
+                ),
               ),
             ),
+
+            // Bottom Navigation
+            _buildBottomNav(),
           ],
         ),
       ),
@@ -269,83 +354,130 @@ finally {
     required String description,
     required bool isEnabled,
   }) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return _buildGlassCard(
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: !isEnabled
+                ? Colors.grey[800]?.withOpacity(0.3)
+                : isOn
+                    ? kPrimaryGreen.withOpacity(0.3)
+                    : Colors.grey[800]?.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            color: !isEnabled
+                ? Colors.grey[400]
+                : isOn
+                    ? kPrimaryGreen
+                    : Colors.white70,
+            size: 28,
+          ),
+        ),
+        title: Text(
+          title,
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: !isEnabled ? Colors.grey[400] : Colors.white,
+          ),
+        ),
+        subtitle: Text(
+          description,
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            color: Colors.white70,
+          ),
+        ),
+        trailing: _isLoading
+            ? SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation(kPrimaryGreen),
+                ),
+              )
+            : Switch(
+                value: isOn,
+                activeColor: kPrimaryGreen,
+                inactiveThumbColor: Colors.grey[400],
+                onChanged: isEnabled ? onToggle : null,
+              ),
+      ),
+    );
+  }
+
+  Widget _buildBottomNav() {
+    return _buildGlassCard(
+      padding: EdgeInsets.zero,
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: !isEnabled
-                ? Colors.grey[300]!
-                : isOn
-                    ? const Color(0xFF22c55e)
-                    : Colors.grey[200]!,
-            width: 2,
+          color: Colors.white10,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
           ),
-          color: !isEnabled
-              ? Colors.grey[100]
-              : isOn
-                  ? const Color(0xFF22c55e).withOpacity(0.05)
-                  : Colors.white,
         ),
-        child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          leading: Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: !isEnabled
-                  ? Colors.grey[200]
-                  : isOn
-                      ? const Color(0xFF22c55e).withOpacity(0.2)
-                      : Colors.grey[200],
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              icon,
-              color: !isEnabled
-                  ? Colors.grey[400]
-                  : isOn
-                      ? const Color(0xFF22c55e)
-                      : Colors.grey[600],
-              size: 28,
-            ),
-          ),
-          title: Text(
-            title,
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: !isEnabled ? Colors.grey[400] : Colors.grey[800],
-            ),
-          ),
-          subtitle: Text(
-            description,
-            style: GoogleFonts.poppins(
-              fontSize: 12,
-              color: Colors.grey[600],
-            ),
-          ),
-          trailing: _isLoading
-              ? SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation(
-                      const Color(0xFF22c55e),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(Icons.home, 'Home', false, () {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                }),
+                _buildNavItem(Icons.notifications, 'Alerts', false, () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AlertsPage(deviceId: widget.farm.deviceId!),
                     ),
-                  ),
-                )
-              : Switch(
-                  value: isOn,
-                  activeColor: const Color(0xFF22c55e),
-                  inactiveThumbColor: Colors.grey[400],
-                  onChanged: isEnabled ? onToggle : null,
-                ),
+                  );
+                }),
+                _buildNavItem(Icons.flash_on, 'Control', true, () {}),
+                _buildNavItem(Icons.bar_chart, 'Analytics', false, () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => DashboardPage(deviceId: widget.farm.deviceId!),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
-}
 
+  Widget _buildNavItem(IconData icon, String label, bool isActive, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: isActive ? kPrimaryGreen : Colors.white70,
+            size: 24,
+          ),
+          SizedBox(height: 4),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 11,
+              color: isActive ? kPrimaryGreen : Colors.white70,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
