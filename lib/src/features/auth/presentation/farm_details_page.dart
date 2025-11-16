@@ -1,6 +1,7 @@
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:naihydro/src/features/auth/presentation/settings_page.dart';
+import 'dart:ui'; 
 import '../presentation/data/farm_repository.dart';
 import '../presentation/models/farm_model.dart';
 import 'dart:async';
@@ -9,9 +10,19 @@ import 'control_panel.dart';
 import 'package:naihydro/src/features/auth/presentation/dashboard_page.dart';
 import 'package:naihydro/src/features/auth/presentation/alerts_page.dart';
 
+// --- CUSTOM THEME COLORS & CONSTANTS ---
+const Color kPrimaryGreen = Color(0xFF558B2F); // A deep, earthy green
+const Color kAccentGreen = Color(0xFF8BC34A); // A lighter, vibrant green
+const Color kBackgroundColor = Color(0xFFC7CEC8); // Muted gray-green background from image
+const Color kCardColor = Colors.white10; // Transparent white for glass effect
+const Color kDarkText = Colors.white70; // Dark text
+const Color kLightText = Colors.white;
+
 class FarmDetailsPage extends StatefulWidget {
   final FarmRepository repository;
   final FarmModel farm;
+
+
 
   const FarmDetailsPage({
     required this.repository,
@@ -25,10 +36,15 @@ class FarmDetailsPage extends StatefulWidget {
 
 class _FarmDetailsPageState extends State<FarmDetailsPage> {
   late final Stream<Map<String, dynamic>> _sensorStream;
+  DateTime? _lastUpdateTime;
+  late final FarmRepository _repo;
+   late final Stream<List<FarmModel>> _farmsStream;
 
   @override
   void initState() {
     super.initState();
+     _repo = FarmRepository();
+      _farmsStream = _repo.getFarmsStream();
     _sensorStream = widget.repository.sensorsForFarm(widget.farm.id);
   }
 
@@ -36,12 +52,12 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
     // Check critical conditions
     final waterLevel = _toDouble(sensors['waterLevel']);
     final nutrientLevel = _toDouble(
-  sensors['nutrientLevel'] ?? sensors['TDS'] ?? sensors['tds']
-);
+      sensors['TDS'] ?? sensors['TDS'] ?? sensors['nutrientLevel']
+    );
 
     
     if (waterLevel != null && waterLevel < 20) return 'critical';
-    if (nutrientLevel != null && nutrientLevel < 30) return 'critical';
+    if (nutrientLevel != null && nutrientLevel < 700) return 'critical';
     
     // Check warnings
     final ph = _toDouble(sensors['ph']);
@@ -50,7 +66,7 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
     if (ph != null && (ph < 6.0 || ph > 7.0)) return 'warning';
     if (temp != null && (temp < 20 || temp > 26)) return 'warning';
     if (waterLevel != null && waterLevel < 30) return 'warning';
-    if (nutrientLevel != null && nutrientLevel < 60) return 'warning';
+    if (nutrientLevel != null && (nutrientLevel < 1000 || nutrientLevel > 1800)) return 'warning';
     
     return 'optimal';
   }
@@ -63,204 +79,260 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
     return null;
   }
 
-  String _formatTime(dynamic timestamp) {
+  String _formatTime(DateTime? timestamp) {
     if (timestamp == null) return 'Unknown';
-    
     try {
-      DateTime dt;
-      if (timestamp is String) {
-        dt = DateTime.parse(timestamp);
-      } else if (timestamp is int) {
-        dt = DateTime.fromMillisecondsSinceEpoch(timestamp);
-      } else {
-        return 'Unknown';
-      }
-      
-      return '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      return '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
     } catch (e) {
       return 'Unknown';
     }
+  }
+//  Extract timestamp from sensors data
+  DateTime? _extractTimestamp(Map<String, dynamic> sensors) {
+    try {
+      final timestamp = sensors['timestamp'];
+      if (timestamp == null) return null;
+ DateTime dt;
+
+     if (timestamp is String) {
+      dt = DateTime.parse(timestamp);
+    } else if (timestamp is int) {
+      dt = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    } else {
+      return null;
+    }
+
+    // Convert to local time
+    return dt.toLocal();
+
+  } catch (e) {
+    return null;
+  }
+}
+
+  Widget _buildGlassCard({required Widget child, EdgeInsetsGeometry? padding}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        child: Container(
+          padding: padding ?? const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: kCardColor, // Semi-transparent background
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.3), // Light border
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: child,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: StreamBuilder<Map<String, dynamic>>(
-        stream: _sensorStream,
-        builder: (context, snapshot) {
-          final sensors = snapshot.data ?? {};
-          final hasData = sensors.isNotEmpty;
-          final overallStatus = hasData ? _getOverallStatus(sensors) : 'unknown';
+      // 1. Set Scaffold background to transparent or the base color
+      backgroundColor: Colors.transparent, 
+      body: Container(
+        // 2. Wrap the entire body with a Container for the background image
+        decoration: BoxDecoration(
+          color: kBackgroundColor,
+          image: const DecorationImage(
+            // **NOTE**: Update this path to your specific background image asset.
+            image: AssetImage('assets/images/detailspg.jpeg'), 
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: StreamBuilder<Map<String, dynamic>>(
+          stream: _sensorStream,
+          builder: (context, snapshot) {
+            final sensors = snapshot.data ?? {};
+            final hasData = sensors.isNotEmpty;
+            final overallStatus = hasData ? _getOverallStatus(sensors) : 'unknown';
+          
+            if (hasData) {
+              _lastUpdateTime = _extractTimestamp(sensors);
+            }
 
-          return Column(
-            children: [
-              // Header
-              Container(
-                color: Colors.white,
-                child: SafeArea(
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            IconButton(
-                              icon: Icon(Icons.arrow_back),
-                              onPressed: () => Navigator.of(context).pop(),
-                            ),
-                            Icon(Icons.eco, color: Color(0xFF22c55e), size: 32),
-                            SizedBox(width: 8),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    widget.farm.name,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFF22c55e),
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  Row(
-                                    children: [
-                                      Icon(Icons.location_on, size: 12, color: Colors.grey[600]),
-                                      SizedBox(width: 4),
-                                      Expanded(
-                                        child: Text(
-                                          widget.farm.location,
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 12,
-                                            color: Colors.grey[600],
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              icon: Icon(Icons.settings),
-                              onPressed: () {
-                                // Settings
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Status Card
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Container(
-                          width: double.infinity,
-                          padding: EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: overallStatus == 'optimal'
-                                ? Colors.green[50]
-                                : overallStatus == 'warning'
-                                    ? Colors.yellow[50]
-                                    : Colors.red[50],
-                            border: Border.all(
-                              color: overallStatus == 'optimal'
-                                  ? Colors.green[200]!
-                                  : overallStatus == 'warning'
-                                      ? Colors.yellow[200]!
-                                      : Colors.red[200]!,
-                              width: 2,
-                            ),
-
-                            borderRadius: BorderRadius.circular(12),
-                          ),
+            return Column(
+              children: [
+                // Header
+                Container(
+                  // Use a subtle color or keep it mostly transparent against the background
+                  color: Colors.transparent, 
+                  child: SafeArea(
+                    bottom: false,
+                    child: Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 16, 16, 8),
                           child: Row(
                             children: [
-                              Icon(
-                                Icons.dashboard,
-                                color: overallStatus == 'optimal'
-                                    ? Colors.green[600]
-                                    : overallStatus == 'warning'
-                                        ? Colors.yellow[700]
-                                        : Colors.red[600],
-                                size: 24,
+                              IconButton(
+                                icon: Icon(Icons.arrow_back, color: kDarkText),
+                                onPressed: () => Navigator.of(context).pop(),
                               ),
-                              SizedBox(width: 12),
+                              Icon(Icons.eco, color: kPrimaryGreen, size: 32),
+                              SizedBox(width: 8),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      overallStatus == 'optimal'
-                                          ? 'All systems operational'
-                                          : overallStatus == 'warning'
-                                              ? 'Some parameters need attention'
-                                              : overallStatus == 'critical'
-                                                  ? 'Critical conditions detected'
-                                                  : 'No data available',
+                                      widget.farm.name,
                                       style: GoogleFonts.poppins(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                        color: overallStatus == 'optimal'
-                                            ? Colors.green[800]
-                                            : overallStatus == 'warning'
-                                                ? Colors.yellow[800]
-                                                : Colors.red[800],
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white70,
                                       ),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
-                                    SizedBox(height: 4),
-                                    Text(
-                                      'Last updated: ${DateTime.now().hour}:${DateTime.now().minute.toString().padLeft(2, '0')}',
-                                      style: GoogleFonts.poppins(
-                                        fontSize: 11,
-                                        color: Colors.grey[600],
-                                      ),
+                                    Row(
+                                      children: [
+                                        Icon(Icons.location_on, size: 12, color: Colors.white70),
+                                        SizedBox(width: 4),
+                                        Expanded(
+                                          child: Text(
+                                            widget.farm.location,
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 12,
+                                              color:Colors.white70,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
                               ),
+                              IconButton(
+                                icon: Icon(Icons.settings, color:Colors.white70),
+                                onPressed: () {
+                                 Navigator.push(
+                                   context,
+                                   MaterialPageRoute(
+                                     builder: (_) =>  SettingsPage(
+                                      onNavigate: (page) {
+       
+        Navigator.pop(context);
+      },
+      onLogout: () {
+        // Logout logic if needed
+        Navigator.pop(context);
+      },
+                                     ),
+                                   ),
+                                 );
+                                },
+                              ),
                             ],
                           ),
                         ),
-                      ),
-                      SizedBox(height: 16),
-                    ],
+
+                        // Status Card
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: _buildGlassCard(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.dashboard,
+                                  color: overallStatus == 'optimal'
+                                    ? kPrimaryGreen
+                                    : overallStatus == 'warning'
+                                      ? Colors.orange
+                                      : Colors.red,
+                                  size: 24,
+                                ),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        overallStatus == 'optimal'
+                                          ? 'All systems operational'
+                                          : overallStatus == 'warning'
+                                            ? 'Some parameters need attention'
+                                            : overallStatus == 'critical'
+                                              ? 'Critical conditions detected'
+                                              : 'No data available',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: overallStatus == 'optimal'
+                                            ? kPrimaryGreen
+                                            : overallStatus == 'warning'
+                                              ? Colors.orange[800]
+                                              : Colors.red[600],
+                                        ),
+                                      ),
+                                      SizedBox(height: 4),
+                                      Text(
+                                        'Last updated: ${_formatTime(_lastUpdateTime)}',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 11,
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: 16),
+                      ],
+                    ),
                   ),
                 ),
-              ),
 
-              // Content
-              Expanded(
-                child: !hasData
-                    ? _buildNoDataState()
-                    : _buildSensorData(sensors),
-              ),
+                // Content
+                Expanded(
+                  child: !hasData
+                      ? _buildNoDataState()
+                      : _buildSensorData(sensors),
+                ),
 
-              // Bottom Navigation
-              _buildBottomNav(),
-            ],
-          );
-        },
+                // Bottom Navigation
+                _buildBottomNav(),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
 
   Widget _buildNoDataState() {
+    // ... (no changes needed here)
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.sensors_off, size: 64, color: Colors.grey[400]),
+            Icon(Icons.sensors_off, size: 64, color: kDarkText.withOpacity(0.4)),
             SizedBox(height: 16),
             Text(
               'No Sensor Data',
               style: GoogleFonts.poppins(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[700],
+                color: kDarkText,
               ),
             ),
             SizedBox(height: 8),
@@ -269,7 +341,7 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
                 fontSize: 14,
-                color: Colors.grey[600],
+                color: kDarkText.withOpacity(0.7),
               ),
             ),
           ],
@@ -278,14 +350,26 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
     );
   }
 
+  // --- MODIFIED _buildSensorData METHOD ---
   Widget _buildSensorData(Map<String, dynamic> sensors) {
     final ph = _toDouble(sensors['ph']);
     final temp = _toDouble(sensors['temperature']);
     final water = _toDouble(sensors['waterLevel']);
     final nutrients = _toDouble(
-      sensors['TDS'] ?? sensors['tds'] ?? sensors['nutrientLevel']
+      sensors['TDS'] ?? sensors['TDS'] ?? sensors['nutrientLevel']
     );
-    final timestamp = sensors['updatedAt'] ?? sensors['timestamp'];
+      final humidity = _toDouble(sensors['DHT_humidity'] ?? sensors['humidity']);
+    final lastUpdatedStr = _formatTime(_lastUpdateTime);
+
+    // Prepare the asset path for the crop image
+    String cropAssetPath = '';
+    if (widget.farm.cropType != null) {
+      // Normalise crop type name (e.g., "Lettuce Profile" -> "lettuce")
+      final cropName = widget.farm.cropType!.toLowerCase().split(' ').first;
+      // **NOTE**: This assumes your images are named 'lettuce.png', 'tomato.png', etc.
+      // and are located in the assets/crops folder.
+      cropAssetPath = 'assets/crops/$cropName.png';
+    }
 
     return SingleChildScrollView(
       child: Padding(
@@ -293,29 +377,41 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Farm Image (optional - can be removed or customized)
+            // Farm Image/Crop Info (MODIFIED TO FILL CARD)
             if (widget.farm.cropType != null)
-              Container(
-                height: 120,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF22c55e).withOpacity(0.3), Color(0xFF16a34a).withOpacity(0.5)],
-                  ),
-                ),
-                child: Center(
+              _buildGlassCard(
+                padding: EdgeInsets.zero, // Remove padding from the card itself
+                child: Container(
+                  width: double.infinity,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.grass, size: 48, color: Colors.white),
-                      SizedBox(height: 8),
-                      Text(
-                        widget.farm.cropType!,
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                      // Image widget modified to use AspectRatio and BoxFit.cover
+                      AspectRatio(
+                        aspectRatio: 16 / 9, // Define the desired image shape (e.g., 4/3 or 16/9)
+                        child: Image.asset(
+                          cropAssetPath,
+                          fit: BoxFit.cover, // Ensures the image fills the entire AspectRatio box
+                          errorBuilder: (context, error, stackTrace) {
+                            // Fallback if the specific image is not found
+                            return Container(
+                              color: kPrimaryGreen.withOpacity(0.1),
+                              child: Center(child: Icon(Icons.grass, size: 48, color: kPrimaryGreen)),
+                            );
+                          },
+                        ),
+                      ),
+                      
+                      // Text is placed below the image and is padded
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 8.0),
+                        child: Text(
+                          widget.farm.cropType!,
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                     ],
@@ -330,7 +426,7 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
               style: GoogleFonts.poppins(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
+                color: Colors.white70,
               ),
             ),
             SizedBox(height: 16),
@@ -349,32 +445,39 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
                   value: ph?.toStringAsFixed(1) ?? '-',
                   icon: Icons.science,
                   status: _getPhStatus(ph),
-                  lastUpdated: _formatTime(timestamp),
+                  lastUpdated: lastUpdatedStr,
                 ),
                 _buildStatusCard(
                   title: 'Temperature',
                   value: temp != null ? '${temp.toStringAsFixed(1)}°C' : '-',
                   icon: Icons.thermostat,
                   status: _getTempStatus(temp),
-                  lastUpdated: _formatTime(timestamp),
+                  lastUpdated: lastUpdatedStr,
                 ),
                 _buildStatusCard(
                   title: 'Water Level',
                   value: water != null ? '${water.toStringAsFixed(1)}cm' : '-',
                   icon: Icons.water_drop,
                   status: _getWaterStatus(water),
-                  lastUpdated: _formatTime(timestamp),
+                  lastUpdated: lastUpdatedStr,
                 ),
                 _buildStatusCard(
                   title: 'Nutrients',
                   value: nutrients != null ? '${nutrients.toStringAsFixed(0)} ppm' : '-',
                   icon: Icons.eco,
                   status: _getNutrientStatus(nutrients),
-                  lastUpdated: _formatTime(timestamp),
+                  lastUpdated: lastUpdatedStr,
+                ),
+        
+                _buildStatusCard(
+                  title: 'Humidity',
+                  value: humidity != null ? '${humidity.toStringAsFixed(0)}%' : '-',
+                  icon: Icons.water,
+                  status: _getHumidityStatus(humidity),
+                  lastUpdated: lastUpdatedStr,
                 ),
               ],
             ),
-
             SizedBox(height: 24),
 
             // Quick Actions
@@ -383,7 +486,7 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
               style: GoogleFonts.poppins(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[800],
+                color: Colors.white,
               ),
             ),
             SizedBox(height: 16),
@@ -442,30 +545,17 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
     required String lastUpdated,
   }) {
     Color statusColor;
-    Color bgColor;
-    Color borderColor;
-
+    
     if (status == 'optimal') {
-      statusColor = Colors.green[600]!;
-      bgColor = Colors.green[50]!;
-      borderColor = Colors.green[200]!;
+      statusColor = kPrimaryGreen;
     } else if (status == 'warning') {
-      statusColor = Colors.yellow[700]!;
-      bgColor = Colors.yellow[50]!;
-      borderColor = Colors.yellow[300]!;
+      statusColor = Colors.orange;
     } else {
-      statusColor = Colors.red[600]!;
-      bgColor = Colors.red[50]!;
-      borderColor = Colors.red[200]!;
+      statusColor = Colors.red;
     }
 
-    return Container(
+    return _buildGlassCard(
       padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: bgColor,
-        border: Border.all(color: borderColor, width: 2),
-        borderRadius: BorderRadius.circular(12),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -480,7 +570,7 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
                   style: GoogleFonts.poppins(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: Colors.grey[700],
+                    color: Colors.white
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -498,10 +588,10 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
           ),
           SizedBox(height: 4),
           Text(
-            lastUpdated,
+            'Last Update: $lastUpdated',
             style: GoogleFonts.poppins(
               fontSize: 10,
-              color: Colors.grey[600],
+              color: Colors.white,
             ),
           ),
         ],
@@ -514,75 +604,83 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
     required String label,
     required VoidCallback onTap,
   }) {
-    return OutlinedButton(
-      onPressed: onTap,
-      style: OutlinedButton.styleFrom(
-        padding: EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        side: BorderSide(color: Colors.grey[300]!),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 20),
-          SizedBox(width: 8),
-          Text(
-            label,
-            style: GoogleFonts.poppins(fontSize: 14),
+    return _buildGlassCard(
+      padding: EdgeInsets.zero,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 20, color: kPrimaryGreen),
+              SizedBox(width: 8),
+              Text(
+                label,
+                style: GoogleFonts.poppins(fontSize: 14, color: Colors.white),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 
   Widget _buildBottomNav() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: Colors.grey[200]!)),
+    return _buildGlassCard(
+      padding: EdgeInsets.zero,
+      child: Container(
+        decoration: BoxDecoration(
+          // Inner decoration to fine-tune the glass look of the bar
+          color: Colors.white10, 
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(Icons.home, 'Home', true, () {
+                  Navigator.of(context).push( MaterialPageRoute(
+        builder: (_) => FarmDetailsPage(repository: _repo, farm: widget.farm),
       ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(Icons.home, 'Home', true, () {
-                Navigator.of(context).pop();
-              }),
-                  _buildNavItem(Icons.notifications, 'Alerts', false, () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => AlertsPage(
-                   
-                  ),
-                ),
-              );
-            }),
-              _buildNavItem(Icons.flash_on, 'Control', false, () {Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ControlPanelPage(
-                      farm: widget.farm,
-                      repository: widget.repository,
+    );
+                }),
+                _buildNavItem(Icons.notifications, 'Alerts', false, () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AlertsPage(deviceId: widget.farm.deviceId!),
                     ),
-                  ),
-                );
-              }),
-              _buildNavItem(Icons.bar_chart, 'Analytics', false, () {
+                  );
+                }),
+                _buildNavItem(Icons.flash_on, 'Control', false, () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ControlPanelPage(
+                        farm: widget.farm,
+                        repository: widget.repository,
+                      ),
+                    ),
+                  );
+                }),
+                _buildNavItem(Icons.bar_chart, 'Analytics', false, () {
 
-             Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => DashboardPage(
- ),
-                ),
-              );
-            }),
-            ],
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => DashboardPage( deviceId: widget.farm.deviceId!,),
+                    ),
+                  );
+                }),
+              ],
+            ),
           ),
         ),
       ),
@@ -597,7 +695,7 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
         children: [
           Icon(
             icon,
-            color: isActive ? Color(0xFF22c55e) : Colors.grey[600],
+            color: isActive ? kPrimaryGreen : Colors.white70,
             size: 24,
           ),
           SizedBox(height: 4),
@@ -605,7 +703,7 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
             label,
             style: GoogleFonts.poppins(
               fontSize: 11,
-              color: isActive ? Color(0xFF22c55e) : Colors.grey[600],
+              color: isActive ? kPrimaryGreen : Colors.white70,
             ),
           ),
         ],
@@ -627,18 +725,26 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
 
   String _getWaterStatus(double? water) {
     if (water == null) return 'unknown';
-    if (water > 30) return 'optimal';
-    if (water > 15) return 'warning';
+    if (water > 1) return 'optimal';//shallow farm
+    if (water > 5) return 'warning';
     return 'critical';
   }
 
- String _getNutrientStatus(double? value) {
+String _getNutrientStatus(double? value) {
   if (value == null) return 'unknown';
-  if (value < 700) return 'critical';     // too low
-  if (value < 1000) return 'warning';     // moderate
-  if (value <= 1500) return 'optimal';    // healthy range
-  if (value > 1800) return 'critical';    // too concentrated
-  return 'warning';                       // fallback
+  if (value < 500) return 'critical';        // too low
+  if (value >= 500 && value <= 1000) return 'optimal';  // healthy range
+  if (value > 1000 && value <= 1800) return 'warning';  // moderate-high
+  if (value > 1800) return 'critical';      // too high
+  return 'unknown';
 }
 
+
+  String _getHumidityStatus(double? humidity) {
+    if (humidity == null) return 'unknown';
+    if (humidity < 30) return 'warning'; // Too dry
+    if (humidity >= 40 && humidity <= 80) return 'optimal';
+    if (humidity > 85) return 'warning'; // Too humid
+    return 'warning';
+  }
 }

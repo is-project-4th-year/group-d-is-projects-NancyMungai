@@ -2,13 +2,19 @@ import firebase_admin
 from firebase_admin import storage, credentials, db
 from firebase_functions import https_fn, db_fn
 import os
+from datetime import datetime
 
 # Initialize Firebase App once - do this BEFORE heavy imports
-cred = credentials.Certificate("serviceAccountKey.json")
+
+cred = credentials.Certificate("naihydro-d62ba461064f.json")
+
 firebase_admin.initialize_app(cred, {
-    "databaseURL": "https://naihydro-default-rtdb.europe-west1.firebasedatabase.app/",
-    "storageBucket": "naihydro.firebasestorage.app"
+    "databaseURL": "https://naihydro-default-rtdb.europe-west1.firebasedatabase.app",
+    "storageBucket": "naihydro"
 })
+
+
+
 
 # Lazy imports - only import heavy libraries when needed
 _numpy = None
@@ -49,18 +55,31 @@ def load_model():
             tempfile = get_tempfile()
             
             temp_model_path = os.path.join(tempfile.gettempdir(), "rf_xgb_ensemble.joblib")
-            
-            # Check if model is already cached in temp
-            if not os.path.exists(temp_model_path):
+
+            def is_valid_file(path):
+                try:
+                    with open(path, 'rb') as f:
+                        f.seek(-1, os.SEEK_END)
+                        return True
+                except Exception:
+                    return False
+             # If file missing or corrupted, download fresh
+            if not os.path.exists(temp_model_path) or not is_valid_file(temp_model_path):
                 print("📥 Downloading model from Firebase Storage...")
                 blob = bucket.blob(MODEL_PATH)
                 blob.download_to_filename(temp_model_path)
                 print("✅ Model downloaded successfully")
             else:
                 print("📦 Using cached model")
-            
-            model_dict = joblib.load(temp_model_path)
 
+            try:
+                model_dict = joblib.load(temp_model_path)
+            except EOFError:
+                print("⚠️ Detected corrupted model file, redownloading...")
+                blob = bucket.blob(MODEL_PATH)
+                blob.download_to_filename(temp_model_path)
+                model_dict = joblib.load(temp_model_path)
+                print("✅ Model reloaded successfully after redownload")
             if isinstance(model_dict, dict):
                 model = model_dict
                 print("✅ Model dictionary loaded successfully.")
@@ -176,7 +195,6 @@ def make_prediction(features, m):
         
         # CRITICAL: Do NOT apply PCA
         # The models were trained on scaled features, not PCA components
-        # (Verified by debug_pipeline.py - RF/XGB expect 27 features, not 5)
         
         # Make predictions with both models
         rf_pred = m["rf"].predict(features)
@@ -283,8 +301,12 @@ def predict_latest_data(req: https_fn.Request) -> https_fn.Response:
 )
 def predict_on_new_data(event: db_fn.Change):
     """
+    ✅ UPDATED: Now stores historical data in /history/{deviceId}
+    
     Triggered when new data is uploaded by Arduino to /devices/{deviceId}/latest
-    Automatically runs prediction and saves results in /processed/{deviceId}
+    Automatically runs prediction and saves results in:
+    1. /processed/{deviceId} - Latest reading (flat structure for real-time)
+    2. /history/{deviceId}/{timestamp} - Historical data for analytics
     
     Extracts only the required sensor readings from Firebase data:
     - pH, TDS, water_level, DHT_temp, DHT_humidity
@@ -338,21 +360,63 @@ def predict_on_new_data(event: db_fn.Change):
         # Make prediction
         prediction = make_prediction(features, m)
         
-        # Save prediction result back to Firebase
+        # Get device ID
         device_id = event.params["deviceId"]
-        result = {
-            "sensor_readings": base_data,  # Only the 5 features used
+        
+        # Prepare result with timestamp
+        current_timestamp_ms = int(datetime.utcnow().timestamp() * 1000)
+        timestamp_iso = datetime.utcnow().isoformat() + "Z"
+        
+        processed_data = {
+            "pH": base_data["pH"],
+            "TDS": base_data["TDS"],
+            "water_level": base_data["water_level"],
+            "DHT_temp": base_data["DHT_temp"],
+            "DHT_humidity": base_data["DHT_humidity"],
             "prediction": int(prediction),
-            "raw_data": data, 
-           "timestamp": {".sv": "timestamp"}
-
+            "timestamp": timestamp_iso,
+            "deviceId": device_id
+        }
+            
+        # Read existing pump_state to preserve it (don't overwrite control commands)
+        try:
+            existing_processed = db.reference(f"/processed/{device_id}").get()
+            if existing_processed and isinstance(existing_processed, dict):
+                # Keep existing control states
+                if "pump_state" in existing_processed:
+                    processed_data["pump_state"] = existing_processed["pump_state"]
+                if "relay_state" in existing_processed:
+                    processed_data["relay_state"] = existing_processed["relay_state"]
+                if "lights" in existing_processed:
+                    processed_data["lights"] = existing_processed["lights"]
+                if "fan" in existing_processed:
+                    processed_data["fan"] = existing_processed["fan"]
+        except Exception as e:
+            print(f"⚠️ Could not read existing processed data: {e}")
+        
+        db.reference(f"/processed/{device_id}").update(processed_data)
+        print(f"✅ Updated /processed/{device_id} with latest reading + prediction")
+        
+        # ✅ STEP 2: Save to /history/{deviceId}/{timestamp} for analytics
+        # Use milliseconds timestamp as key for easy sorting
+        history_data = {
+            "pH": base_data["pH"],
+            "TDS": base_data["TDS"],
+            "water_level": base_data["water_level"],
+            "DHT_temp": base_data["DHT_temp"],
+            "DHT_humidity": base_data["DHT_humidity"],
+            "prediction": int(prediction),
+            "timestamp": timestamp_iso,
+            "timestamp_ms": current_timestamp_ms
         }
         
-        db.reference(f"/processed/{device_id}").push(result)
-        print(f" Prediction saved for device {device_id}: {prediction}")
+        db.reference(f"/history/{device_id}/{current_timestamp_ms}").set(history_data)
+        print(f"✅ Saved to /history/{device_id}/{current_timestamp_ms}")
+        
+        print(f"🎉 Complete! Prediction: {prediction} | Device: {device_id}")
         
     except Exception as e:
-        print(f"Error in database trigger: {e}")
+        print(f"❌ Error in database trigger: {e}")
         import traceback
         traceback.print_exc()
         # Don't re-raise to avoid function retry loops
