@@ -4,7 +4,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:naihydro/src/features/auth/presentation/data/auth_service.dart';
 import 'package:naihydro/src/features/auth/presentation/signup_page.dart';
 import '../../common/services/notification_service.dart';
-import '../../common/widgets/primary_button.dart';
+import 'dart:ui';
+
+// Match farm details page theme
+const Color kPrimaryGreen = Color(0xFF558B2F);
+const Color kAccentGreen = Color(0xFF8BC34A);
+const Color kBackgroundColor = Color(0xFFC7CEC8);
+const Color kCardColor = Colors.white10;
+const Color kLightText = Colors.white;
 
 class LoginPage extends StatefulWidget {
   final VoidCallback onSuccess;
@@ -58,7 +65,6 @@ class _LoginPageState extends State<LoginPage> {
 
           print('📥 Fetching farms for user: $uid');
           
-          // Fetch user's farms
           final farmsSnapshot = await dbRef.get();
 
           if (farmsSnapshot.exists) {
@@ -69,18 +75,14 @@ class _LoginPageState extends State<LoginPage> {
             final deviceId = firstFarm['deviceId'] ?? 'esp32-001';
             print('🌱 Found farm deviceId: $deviceId');
 
-            // Initialize notifications with both deviceId and userId
             await NotificationService().initialize(deviceId, uid);
             print('✅ Notifications initialized for device: $deviceId');
           } else {
             print('⚠️ No farms found for user');
-            
-            // Initialize with default device but pass userId
             await NotificationService().initialize('esp32-001', uid);
           }
         } catch (notifError) {
           print('⚠️ Error initializing notifications: $notifError');
-          // Don't block login if notifications fail
         }
 
         widget.onSuccess();
@@ -102,185 +104,242 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  Widget _buildGlassCard({required Widget child, EdgeInsetsGeometry? padding}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: padding ?? const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: kCardColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.3),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
-        children: [
-          // Header with background image
-          Stack(
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: BoxDecoration(
+          color: kBackgroundColor,
+          image: const DecorationImage(
+            image: AssetImage('assets/images/detailspg.jpeg'),
+            fit: BoxFit.cover,
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
             children: [
-              SizedBox(
-                height: 200,
-                width: double.infinity,
-                child: ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    bottom: Radius.circular(24),
-                  ),
-                  child: Image.asset(
-                    "assets/images/authpages.jpg",
-                    fit: BoxFit.cover,
-                  ),
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.arrow_back, color: kLightText),
+                      onPressed: widget.onBack,
+                    ),
+                    Spacer(),
+                    Text(
+                      "naihydro",
+                      style: GoogleFonts.poppins(
+                        color: kLightText,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              Container(
-                height: 200,
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.vertical(
-                    bottom: Radius.circular(24),
-                  ),
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.black.withOpacity(0.4),
-                      Colors.transparent,
-                      Colors.black.withOpacity(0.4),
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                ),
-              ),
-              Positioned(
-                left: 16,
-                top: 40,
-                child: CircleAvatar(
-                  backgroundColor: Colors.white24,
-                  child: IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: widget.onBack,
-                  ),
-                ),
-              ),
-              Positioned(
-                right: 16,
-                top: 48,
-                child: Text(
-                  "naihydro",
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+
+              // Form Card
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: _buildGlassCard(
+                    child: Form(
+                      key: _formKey,
+                      autovalidateMode: AutovalidateMode.onUserInteraction,
+                      child: Column(
+                        children: [
+                          Text(
+                            "Welcome Back",
+                            style: GoogleFonts.poppins(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: kLightText,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            "Sign in to monitor your hydroponic farm",
+                            style: GoogleFonts.poppins(
+                              color: kLightText.withOpacity(0.8),
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+
+                          // Email Field
+                          TextFormField(
+                            controller: emailCtrl,
+                            keyboardType: TextInputType.emailAddress,
+                            style: GoogleFonts.poppins(color: kLightText),
+                            decoration: InputDecoration(
+                              labelText: "Email",
+                              labelStyle: GoogleFonts.poppins(color: kLightText.withOpacity(0.7)),
+                              prefixIcon: Icon(Icons.email_outlined, color: kAccentGreen),
+                              filled: true,
+                              fillColor: Colors.white.withOpacity(0.1),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: kAccentGreen, width: 2),
+                              ),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your email';
+                              }
+                              final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
+                              if (!emailRegex.hasMatch(value)) {
+                                return 'Enter a valid email address';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Password Field
+                          TextFormField(
+                            controller: passCtrl,
+                            obscureText: true,
+                            style: GoogleFonts.poppins(color: kLightText),
+                            decoration: InputDecoration(
+                              labelText: "Password",
+                              labelStyle: GoogleFonts.poppins(color: kLightText.withOpacity(0.7)),
+                              prefixIcon: Icon(Icons.lock_outline, color: kAccentGreen),
+                              filled: true,
+                              fillColor: Colors.white.withOpacity(0.1),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(color: kAccentGreen, width: 2),
+                              ),
+                            ),
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Please enter your password';
+                              }
+                              if (value.length < 6) {
+                                return 'Password must be at least 6 characters';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Sign In Button
+                          SizedBox(
+                            width: double.infinity,
+                            height: 50,
+                            child: ElevatedButton(
+                              onPressed: loading ? null : () => _onSignIn(),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: kPrimaryGreen,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                elevation: 4,
+                              ),
+                              child: loading
+                                  ? CircularProgressIndicator(color: kLightText)
+                                  : Text(
+                                      'Sign In',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        color: kLightText,
+                                      ),
+                                    ),
+                            ),
+                          ),
+
+                          if (error.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 12.0),
+                              child: Text(
+                                error,
+                                style: GoogleFonts.poppins(
+                                  color: Colors.red[300],
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ),
+                          const SizedBox(height: 16),
+
+                          // Sign Up Link
+                          TextButton(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => SignupPage(
+                                    onSuccess: widget.onSuccess,
+                                    onBack: () => Navigator.pop(context),
+                                  ),
+                                ),
+                              );
+                            },
+                            child: Text(
+                              "Don't have an account? Sign up",
+                              style: GoogleFonts.poppins(
+                                color: kAccentGreen,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
             ],
           ),
-
-          // Form Card
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Card(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                elevation: 6,
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Form(
-                    key: _formKey,
-                    autovalidateMode: AutovalidateMode.onUserInteraction,
-                    child: Column(
-                      children: [
-                        Text(
-                          "Welcome Back",
-                          style: GoogleFonts.poppins(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            foreground: Paint()
-                              ..shader = const LinearGradient(
-                                colors: [Colors.green, Colors.teal],
-                              ).createShader(const Rect.fromLTWH(0, 0, 200, 70)),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          "Sign in to monitor your hydroponic farm",
-                          style: GoogleFonts.poppins(color: Colors.grey[600]),
-                        ),
-                        const SizedBox(height: 20),
-                        TextFormField(
-                          controller: emailCtrl,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: InputDecoration(
-                            labelText: "Email",
-                            prefixIcon: const Icon(Icons.email_outlined),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your email';
-                            }
-                            final emailRegex =
-                                RegExp(r'^[^@]+@[^@]+\.[^@]+');
-                            if (!emailRegex.hasMatch(value)) {
-                              return 'Enter a valid email address';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: passCtrl,
-                          obscureText: true,
-                          decoration: InputDecoration(
-                            labelText: "Password",
-                            prefixIcon: const Icon(Icons.lock_outline),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your password';
-                            }
-                            if (value.length < 6) {
-                              return 'Password must be at least 6 characters';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed: loading ? null : () => _onSignIn(),
-                          child: loading
-                              ? const CircularProgressIndicator()
-                              : const Text('Sign In'),
-                        ),
-                        if (error.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 8.0),
-                            child: Text(
-                              error,
-                              style: const TextStyle(color: Colors.red),
-                            ),
-                          ),
-                        const SizedBox(height: 16),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => SignupPage(
-                                  onSuccess: widget.onSuccess,
-                                  onBack: () => Navigator.pop(context),
-                                ),
-                              ),
-                            );
-                          },
-                          child:
-                              const Text("Don't have an account? Sign up"),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

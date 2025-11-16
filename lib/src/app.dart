@@ -1,477 +1,87 @@
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:firebase_database/firebase_database.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+// lib/src/app.dart
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:naihydro/src/features/auth/presentation/data/auth_service.dart';
+import 'features/auth/presentation/landing_page.dart';
+import 'features/auth/presentation/login_page.dart';
+import 'features/auth/presentation/signup_page.dart';
+import 'features/auth/presentation/home_page.dart';
+class NaiHydroApp extends StatelessWidget {
+  const NaiHydroApp({super.key});
 
-class NotificationService {
-  static final NotificationService _instance = NotificationService._internal();
-  late FirebaseMessaging _firebaseMessaging;
-  late FirebaseDatabase _database;
-  late FlutterLocalNotificationsPlugin _localNotifications;
-  
-  // Track last alerts to avoid spam
-  final Map<String, DateTime> _lastAlertTime = {};
-  static const Duration _alertDebounce = Duration(minutes: 5);
+  @override
+  Widget build(BuildContext context) {
+    // Single AuthService injected across pages (simple DI)
+    final authService = AuthService();
 
-  factory NotificationService() {
-    return _instance;
-  }
-
-  NotificationService._internal();
-
-  Future<void> initialize(String deviceId, String userId) async {
-    _firebaseMessaging = FirebaseMessaging.instance;
-    _database = FirebaseDatabase.instance;
-    _localNotifications = FlutterLocalNotificationsPlugin();
-
-    print('============================================================');
-    print('🔔 NOTIFICATION SERVICE INITIALIZATION');
-    print('Device ID: $deviceId');
-    print('User ID: $userId');
-    print('============================================================');
-
-    try {
-      // Request permissions
-      await _requestPermissions();
-
-      // Initialize local notifications with channel
-      await _initializeLocalNotifications();
-
-      // Get FCM Token and save it
-      String? fcmToken = await _firebaseMessaging.getToken();
-      
-      if (fcmToken != null) {
-        print('🎫 FCM Token obtained');
-        print('   Device ID: $deviceId');
-        print('   FCM Token: ${fcmToken.substring(0, 20)}...');
-        print('   User ID: $userId');
-        
-        // Save FCM token to multiple locations
-        await _saveFcmTokenDirectly(deviceId, userId, fcmToken);
-      } else {
-        print('❌ Failed to get FCM token');
-      }
-
-      // Set up message handlers BEFORE listening
-      _setupMessageHandlers();
-
-      // Listen to real-time processed data changes for specific alerts
-      _listenToSensorData(deviceId);
-
-      // Listen to token refresh
-      listenToTokenRefresh(deviceId, userId);
-
-      print('✅ Notification Service initialized successfully');
-      print('============================================================');
-      print('✅ Notifications initialized for device: $deviceId');
-    } catch (e) {
-      print('❌ Error during initialization: $e');
-    }
-  }
-
-  Future<void> _requestPermissions() async {
-    print('\n📋 Requesting notification permissions...');
-    
-    NotificationSettings settings = await _firebaseMessaging.requestPermission(
-      alert: true,
-      announcement: false,
-      badge: true,
-      criticalAlert: false,
-      provisional: false,
-      sound: true,
+    return MaterialApp(
+      title: 'NaiHydro',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        primarySwatch: Colors.green,
+        useMaterial3: true,
+      ),
+      home: AuthGate(authService: authService),
     );
-
-    print('✅ Permissions granted: ${settings.authorizationStatus}');
-  }
-
-  Future<void> _initializeLocalNotifications() async {
-    print('\n🔧 Initializing local notifications...');
-    
-    const AndroidInitializationSettings androidInit =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    
-    const DarwinInitializationSettings iosInit = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
-
-    const InitializationSettings initSettings = InitializationSettings(
-      android: androidInit,
-      iOS: iosInit,
-    );
-
-    await _localNotifications.initialize(initSettings);
-    
-    await _createNotificationChannel();
-    
-    print('   ✅ Local notifications initialized');
-  }
-
-  Future<void> _createNotificationChannel() async {
-    print('   Creating notification channel...');
-    
-    const AndroidNotificationChannel channel = AndroidNotificationChannel(
-      'naihydro_alerts',
-      'Farm Alerts',
-      description: 'Notifications for farm sensor alerts and ML predictions',
-      importance: Importance.high,
-      enableVibration: true,
-      playSound: true,
-      showBadge: true,
-    );
-
-    await _localNotifications
-        .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(channel);
-    
-    print('   ✅ Notification channel created');
-  }
-
-  Future<void> _saveFcmTokenDirectly(
-    String deviceId,
-    String userId,
-    String fcmToken,
-  ) async {
-    try {
-      print('\n💾 Saving FCM token to Realtime Database...');
-
-      // Save to device path
-      await _database.ref('devices/$deviceId/fcmToken').set(fcmToken);
-      print('   ✅ Saved to /devices/$deviceId/fcmToken');
-
-      // Save to user's device mapping
-      await _database.ref('users/$userId/devices/$deviceId/fcmToken').set(fcmToken);
-      print('   ✅ Saved to /users/$userId/devices/$deviceId/fcmToken');
-
-      await _database.ref('devices/$deviceId/fcmTokenUpdated').set(DateTime.now().toIso8601String());
-      
-      print('   ✅ FCM token saved successfully');
-    } catch (e) {
-      print('   ❌ Error saving FCM token: $e');
-    }
-  }
-
-  void _setupMessageHandlers() {
-    print('\n🎧 Setting up message handlers...');
-    
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-    print('   ✅ Background handler registered');
-
-    // Handle FOREGROUND messages
-    FirebaseMessaging.onMessage.listen(
-      (RemoteMessage message) {
-        print('   🔔 FOREGROUND FCM message received!');
-        print('      Title: ${message.notification?.title}');
-        print('      Body: ${message.notification?.body}');
-        print('      Data: ${message.data}');
-        
-        _handleMessage(message);
-      },
-      onError: (error) {
-        print('   ❌ Error in onMessage listener: $error');
-      },
-    );
-
-    // Handle notification tap
-    FirebaseMessaging.onMessageOpenedApp.listen(
-      (RemoteMessage message) {
-        print('   👆 App opened from notification');
-        print('      Title: ${message.notification?.title}');
-      },
-      onError: (error) {
-        print('   ❌ Error in onMessageOpenedApp: $error');
-      },
-    );
-    
-    print('   ✅ Message handlers registered');
-  }
-
-  void _listenToSensorData(String deviceId) {
-    print('\n👂 Setting up sensor data listeners...');
-    print('   Listening to /processed/$deviceId/');
-    
-    _database.ref('processed/$deviceId').onValue.listen(
-      (DatabaseEvent event) {
-        if (event.snapshot.exists) {
-          final data = event.snapshot.value;
-          if (data != null && data is Map<dynamic, dynamic>) {
-            print('   ✅ Processed data changed');
-            _checkAndNotifyForSpecificAlerts(deviceId, data);
-          }
-        }
-      },
-      onError: (error) {
-        print('   ❌ Error listening: $error');
-      },
-    );
-  }
-
-  void _checkAndNotifyForSpecificAlerts(String deviceId, Map<dynamic, dynamic> dataMap) {
-    try {
-      final data = Map<String, dynamic>.from(dataMap);
-
-      // Parse sensor values
-      final waterLevel = _parseDouble(data['water_level']);
-      final tds = _parseDouble(data['TDS']);
-      final ph = _parseDouble(data['pH']);
-      final temp = _parseDouble(data['DHT_temp']);
-      final humidity = _parseDouble(data['DHT_humidity']);
-      final pumpState = data['pump_state'];
-
-      print('\n🔍 Checking sensor thresholds:');
-      print('   Water: ${waterLevel}L | TDS: ${tds}ppm | pH: ${ph}');
-      print('   Temp: ${temp}°C | Humidity: ${humidity}% | Pump: ${pumpState}');
-
-      // ========== CRITICAL WATER LEVEL ==========
-      if (waterLevel > 0 && waterLevel < 10) {
-        _sendDebounceAlert(
-          deviceId,
-          'water_critical',
-          '🚨 CRITICAL: Water Level Very Low',
-          'Water level: ${waterLevel.toStringAsFixed(1)}L - Fill tank immediately!',
-        );
-      } else if (waterLevel > 0 && waterLevel < 20) {
-        _sendDebounceAlert(
-          deviceId,
-          'water_low',
-          '⚠️ WARNING: Water Level Low',
-          'Water level: ${waterLevel.toStringAsFixed(1)}L - Refill soon',
-        );
-      }
-
-      // ========== NUTRIENTS (TDS) ==========
-      if (tds > 0 && tds < 400) {
-        _sendDebounceAlert(
-          deviceId,
-          'tds_low',
-          '🌱 NUTRIENT ALERT: TDS Too Low',
-          'TDS: ${tds.toStringAsFixed(0)}ppm - Nutrients are low, add fertilizer',
-        );
-      } else if (tds > 0 && tds > 2000) {
-        _sendDebounceAlert(
-          deviceId,
-          'tds_high',
-          '🔴 NUTRIENT ALERT: TDS Too High',
-          'TDS: ${tds.toStringAsFixed(0)}ppm - Solution too concentrated, dilute',
-        );
-      }
-
-      // ========== pH LEVEL ==========
-      if (ph > 0 && ph < 5.5) {
-        _sendDebounceAlert(
-          deviceId,
-          'ph_too_low',
-          '🔴 pH ALERT: Too Acidic',
-          'pH: ${ph.toStringAsFixed(1)} - Solution too acidic, add base',
-        );
-      } else if (ph > 0 && ph > 8.5) {
-        _sendDebounceAlert(
-          deviceId,
-          'ph_too_high',
-          '🔴 pH ALERT: Too Alkaline',
-          'pH: ${ph.toStringAsFixed(1)} - Solution too alkaline, add acid',
-        );
-      } else if (ph > 0 && (ph < 6.0 || ph > 8.0)) {
-        _sendDebounceAlert(
-          deviceId,
-          'ph_warning',
-          '⚠️ pH WARNING: Out of Range',
-          'pH: ${ph.toStringAsFixed(1)} - Optimal range: 6.0-8.0',
-        );
-      }
-
-      // ========== TEMPERATURE ==========
-      if (temp > -100 && temp < 15) {
-        _sendDebounceAlert(
-          deviceId,
-          'temp_too_low',
-          '❄️ TEMPERATURE ALERT: Too Cold',
-          'Temperature: ${temp.toStringAsFixed(1)}°C - Heat your grow area',
-        );
-      } else if (temp > -100 && temp > 32) {
-        _sendDebounceAlert(
-          deviceId,
-          'temp_too_high',
-          '🔥 TEMPERATURE ALERT: Too Hot',
-          'Temperature: ${temp.toStringAsFixed(1)}°C - Cool your grow area or improve ventilation',
-        );
-      } else if (temp > -100 && (temp < 18 || temp > 28)) {
-        _sendDebounceAlert(
-          deviceId,
-          'temp_warning',
-          '🌡️ TEMPERATURE WARNING: Out of Range',
-          'Temperature: ${temp.toStringAsFixed(1)}°C - Optimal range: 18-28°C',
-        );
-      }
-
-      // ========== HUMIDITY ==========
-      if (humidity > 0 && humidity < 40) {
-        _sendDebounceAlert(
-          deviceId,
-          'humidity_low',
-          '💧 HUMIDITY ALERT: Too Low',
-          'Humidity: ${humidity.toStringAsFixed(0)}% - Increase moisture in grow area',
-        );
-      } else if (humidity > 0 && humidity > 80) {
-        _sendDebounceAlert(
-          deviceId,
-          'humidity_high',
-          '💨 HUMIDITY ALERT: Too High',
-          'Humidity: ${humidity.toStringAsFixed(0)}% - Improve air circulation',
-        );
-      }
-
-      // ========== PUMP STATE CHANGES ==========
-      _checkPumpState(deviceId, pumpState);
-
-    } catch (e) {
-      print('   ❌ Error checking anomalies: $e');
-    }
-  }
-
-  void _checkPumpState(String deviceId, dynamic pumpState) {
-    if (pumpState == null) return;
-
-    final state = pumpState is int ? pumpState : (pumpState == true ? 1 : 0);
-    
-    if (state == 1) {
-      _sendDebounceAlert(
-        deviceId,
-        'pump_on',
-        '💧 Pump Status',
-        'Water pump is now ON',
-      );
-    } else if (state == 0) {
-      _sendDebounceAlert(
-        deviceId,
-        'pump_off',
-        '💧 Pump Status',
-        'Water pump is now OFF',
-      );
-    }
-  }
-
-  void _sendDebounceAlert(
-    String deviceId,
-    String alertType,
-    String title,
-    String body,
-  ) {
-    final key = '$deviceId:$alertType';
-    final now = DateTime.now();
-    final lastTime = _lastAlertTime[key];
-
-    // Skip if alert was sent recently (debounce)
-    if (lastTime != null && now.difference(lastTime) < _alertDebounce) {
-      print('   ⏭️  Skipping duplicate alert (debounced): $alertType');
-      return;
-    }
-
-    _lastAlertTime[key] = now;
-    _showNotification(title, body, alertType);
-  }
-
-  Future<void> _showNotification(
-    String title,
-    String body,
-    String tag,
-  ) async {
-    try {
-      print('\n📲 Displaying notification...');
-      print('   Title: $title');
-      print('   Body: $body');
-      print('   Tag: $tag');
-      
-      const AndroidNotificationDetails androidDetails =
-          AndroidNotificationDetails(
-        'naihydro_alerts',
-        'Farm Alerts',
-        channelDescription: 'Notifications for farm sensor alerts',
-        importance: Importance.high,
-        priority: Priority.high,
-        showWhen: true,
-        enableVibration: true,
-        playSound: true,
-      );
-
-      const DarwinNotificationDetails iosDetails =
-          DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-      );
-
-      const NotificationDetails notificationDetails = NotificationDetails(
-        android: androidDetails,
-        iOS: iosDetails,
-      );
-
-      final notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-
-      await _localNotifications.show(
-        notificationId,
-        title,
-        body,
-        notificationDetails,
-        payload: tag,
-      );
-
-      print('   ✅ Notification displayed successfully');
-    } catch (e) {
-      print('   ❌ Error showing notification: $e');
-    }
-  }
-
-  void _handleMessage(RemoteMessage message) {
-    print('\n🔄 Processing FCM message...');
-    print('   Message ID: ${message.messageId}');
-    
-    if (message.notification != null) {
-      print('   Has notification: title="${message.notification?.title}", body="${message.notification?.body}"');
-      _showNotification(
-        message.notification!.title ?? 'Alert',
-        message.notification!.body ?? 'New notification',
-        message.data['type'] ?? 'unknown',
-      );
-    }
-  }
-
-  void listenToTokenRefresh(String deviceId, String userId) {
-    print('\n🔄 Listening to token refresh events...');
-    
-    _firebaseMessaging.onTokenRefresh.listen(
-      (String newToken) {
-        print('🔔 FCM Token REFRESHED');
-        print('   New token: ${newToken.substring(0, 30)}...');
-        _saveFcmTokenDirectly(deviceId, userId, newToken);
-      },
-      onError: (error) {
-        print('❌ Error in token refresh: $error');
-      },
-    );
-  }
-
-  // Helper to safely parse doubles
-  double _parseDouble(dynamic value) {
-    if (value == null) return -1;
-    if (value is double) return value;
-    if (value is int) return value.toDouble();
-    if (value is String) {
-      try {
-        return double.parse(value);
-      } catch (e) {
-        return -1;
-      }
-    }
-    return -1;
   }
 }
 
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  print('🔔 BACKGROUND MESSAGE RECEIVED');
-  print('   Message ID: ${message.messageId}');
-  print('   Title: ${message.notification?.title}');
-  print('   Body: ${message.notification?.body}');
+/// AuthGate listens to Firebase auth changes and shows Home when signed in.
+/// If signed out, it shows LandingPage and allows navigation to Login / Signup.
+class AuthGate extends StatelessWidget {
+  final AuthService authService;
+  const AuthGate({required this.authService, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        // waiting for auth state
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+
+        final user = snapshot.data;
+        if (user != null) {
+          // Signed in -> show Home
+          return HomePage(
+            authService: authService,
+            onSignOut: () async {
+              await authService.signOut();
+            },
+          );
+        }
+
+        // Signed out -> Landing
+        return LandingPage(
+          onSignUp: () {
+            Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => SignupPage(
+                onSuccess: () => Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (_) => HomePage(authService: authService, onSignOut: () async => await authService.signOut()),
+                  ),
+                ),
+                onBack: () => Navigator.of(context).pop(),
+              ),
+            ));
+          },
+          onLogin: () {
+            Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => LoginPage(
+                authService: authService,
+                onSuccess: () => Navigator.of(context).pushReplacement(
+                  MaterialPageRoute(
+                    builder: (_) => HomePage(authService: authService, onSignOut: () async => await authService.signOut()),
+                  ),
+                ),
+                onBack: () => Navigator.of(context).pop(),
+              ),
+            ));
+          },
+        );
+      },
+    );
+  }
 }
