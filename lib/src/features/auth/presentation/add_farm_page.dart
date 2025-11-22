@@ -1,9 +1,16 @@
 // lib/src/features/home/presentation/add_farm_page.dart
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'dart:ui';
 import '../presentation/data/farm_repository.dart';
 import '../presentation/models/farm_model.dart';
 import '../presentation/data/auth_service.dart';
+
+const Color kPrimaryGreen = Color(0xFF558B2F);
+const Color kAccentGreen = Color(0xFF8BC34A);
+const Color kBackgroundColor = Color(0xFFC7CEC8);
+const Color kCardColor = Colors.white10;
+const Color kLightText = Colors.white;
 
 class AddFarmPage extends StatefulWidget {
   final FarmRepository repository;
@@ -25,7 +32,7 @@ class _AddFarmPageState extends State<AddFarmPage> {
   final _locationCtrl = TextEditingController();
   final _cropTypeCtrl = TextEditingController();
   final _descriptionCtrl = TextEditingController();
-  final _deviceCtrl = TextEditingController(text: 'esp32-001'); // Default ESP32 ID
+  final _deviceCtrl = TextEditingController(text: 'esp32-001');
   
   bool _saving = false;
   String? _nameError;
@@ -93,77 +100,97 @@ class _AddFarmPageState extends State<AddFarmPage> {
     }
   }
 
+  Widget _buildGlassCard({required Widget child, EdgeInsetsGeometry? padding}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+        child: Container(
+          padding: padding ?? const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: kCardColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.3),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
+              ),
+            ],
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
-        children: [
-          // Header
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF22c55e), Color(0xFF16a34a)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: Offset(0, 2),
-                ),
-              ],
-            ),
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    Icon(Icons.eco, color: Colors.white, size: 32),
-                    SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Add New Farm',
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          'Fill in the farm details',
-                          style: GoogleFonts.poppins(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Spacer(),
-                    IconButton(
-                      icon: Icon(Icons.close, color: Colors.white),
-                      onPressed: () => Navigator.of(context).pop(),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: BoxDecoration(
+          color: kBackgroundColor,
+          image: const DecorationImage(
+            image: AssetImage('assets/images/detailspg.jpeg'),
+            fit: BoxFit.cover,
           ),
-
-          // Form
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
+        ),
+        child: Column(
+          children: [
+            // Header
+            Container(
+              color: Colors.transparent,
+              child: SafeArea(
+                bottom: false,
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        icon: Icon(Icons.arrow_back, color: kLightText),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                      Icon(Icons.eco, color: kAccentGreen, size: 32),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Add New Farm',
+                              style: GoogleFonts.poppins(
+                                color: kLightText,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              'Fill in the farm details',
+                              style: GoogleFonts.poppins(
+                                color: kLightText.withOpacity(0.8),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Form
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: _buildGlassCard(
                   child: Form(
                     key: _formKey,
                     child: Column(
@@ -172,13 +199,14 @@ class _AddFarmPageState extends State<AddFarmPage> {
                         // Header
                         Row(
                           children: [
-                            Icon(Icons.eco, color: Color(0xFF22c55e)),
+                            Icon(Icons.eco, color: kAccentGreen),
                             SizedBox(width: 8),
                             Text(
                               'Farm Information',
                               style: GoogleFonts.poppins(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w600,
+                                color: kLightText,
                               ),
                             ),
                           ],
@@ -191,18 +219,36 @@ class _AddFarmPageState extends State<AddFarmPage> {
                           style: GoogleFonts.poppins(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
+                            color: kLightText,
                           ),
                         ),
                         SizedBox(height: 8),
                         TextField(
                           controller: _nameCtrl,
                           onChanged: (_) => _clearError('name'),
+                          style: GoogleFonts.poppins(color: kLightText),
                           decoration: InputDecoration(
                             hintText: 'e.g., Main Greenhouse',
+                            hintStyle: GoogleFonts.poppins(color: kLightText.withOpacity(0.5)),
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.1),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: _nameError != null ? Colors.red : Colors.grey[300]!,
+                                color: _nameError != null ? Colors.red : Colors.white.withOpacity(0.3),
+                              ),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Colors.white.withOpacity(0.3),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: kAccentGreen,
+                                width: 2,
                               ),
                             ),
                             errorText: _nameError,
@@ -216,18 +262,33 @@ class _AddFarmPageState extends State<AddFarmPage> {
                           style: GoogleFonts.poppins(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
+                            color: kLightText,
                           ),
                         ),
                         SizedBox(height: 8),
                         TextField(
                           controller: _locationCtrl,
                           onChanged: (_) => _clearError('location'),
+                          style: GoogleFonts.poppins(color: kLightText),
                           decoration: InputDecoration(
                             hintText: 'e.g., Building A, Section 1',
+                            hintStyle: GoogleFonts.poppins(color: kLightText.withOpacity(0.5)),
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.1),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
                               borderSide: BorderSide(
-                                color: _locationError != null ? Colors.red : Colors.grey[300]!,
+                                color: Colors.white.withOpacity(0.3),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: kAccentGreen,
+                                width: 2,
                               ),
                             ),
                             errorText: _locationError,
@@ -241,15 +302,33 @@ class _AddFarmPageState extends State<AddFarmPage> {
                           style: GoogleFonts.poppins(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
+                            color: kLightText,
                           ),
                         ),
                         SizedBox(height: 8),
                         TextField(
                           controller: _cropTypeCtrl,
+                          style: GoogleFonts.poppins(color: kLightText),
                           decoration: InputDecoration(
                             hintText: 'e.g., Lettuce, Tomatoes, Herbs',
+                            hintStyle: GoogleFonts.poppins(color: kLightText.withOpacity(0.5)),
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.1),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Colors.white.withOpacity(0.3),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: kAccentGreen,
+                                width: 2,
+                              ),
                             ),
                           ),
                         ),
@@ -261,17 +340,36 @@ class _AddFarmPageState extends State<AddFarmPage> {
                           style: GoogleFonts.poppins(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
+                            color: kLightText,
                           ),
                         ),
                         SizedBox(height: 8),
                         TextField(
                           controller: _deviceCtrl,
+                          style: GoogleFonts.poppins(color: kLightText),
                           decoration: InputDecoration(
                             hintText: 'e.g., esp32-001',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
+                            hintStyle: GoogleFonts.poppins(color: kLightText.withOpacity(0.5)),
                             helperText: 'Link your ESP32 sensor device',
+                            helperStyle: GoogleFonts.poppins(color: kLightText.withOpacity(0.6)),
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.1),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Colors.white.withOpacity(0.3),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: kAccentGreen,
+                                width: 2,
+                              ),
+                            ),
                           ),
                         ),
                         SizedBox(height: 16),
@@ -282,16 +380,34 @@ class _AddFarmPageState extends State<AddFarmPage> {
                           style: GoogleFonts.poppins(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
+                            color: kLightText,
                           ),
                         ),
                         SizedBox(height: 8),
                         TextField(
                           controller: _descriptionCtrl,
                           maxLines: 4,
+                          style: GoogleFonts.poppins(color: kLightText),
                           decoration: InputDecoration(
                             hintText: 'Additional details about this farm...',
+                            hintStyle: GoogleFonts.poppins(color: kLightText.withOpacity(0.5)),
+                            filled: true,
+                            fillColor: Colors.white.withOpacity(0.1),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: Colors.white.withOpacity(0.3),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: BorderSide(
+                                color: kAccentGreen,
+                                width: 2,
+                              ),
                             ),
                           ),
                         ),
@@ -305,11 +421,15 @@ class _AddFarmPageState extends State<AddFarmPage> {
                                 onPressed: () => Navigator.of(context).pop(),
                                 style: OutlinedButton.styleFrom(
                                   padding: EdgeInsets.symmetric(vertical: 16),
+                                  side: BorderSide(color: kLightText.withOpacity(0.5)),
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
-                                child: Text('Cancel'),
+                                child: Text(
+                                  'Cancel',
+                                  style: GoogleFonts.poppins(color: kLightText),
+                                ),
                               ),
                             ),
                             SizedBox(width: 12),
@@ -318,9 +438,9 @@ class _AddFarmPageState extends State<AddFarmPage> {
                                 onPressed: _saving ? null : _save,
                                 style: ElevatedButton.styleFrom(
                                   padding: EdgeInsets.symmetric(vertical: 16),
-                                  backgroundColor: Color(0xFF22c55e),
+                                  backgroundColor: kPrimaryGreen,
                                   shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
                                 child: _saving
@@ -335,9 +455,12 @@ class _AddFarmPageState extends State<AddFarmPage> {
                                     : Row(
                                         mainAxisAlignment: MainAxisAlignment.center,
                                         children: [
-                                          Icon(Icons.save, size: 18),
+                                          Icon(Icons.save, size: 18, color: kLightText),
                                           SizedBox(width: 8),
-                                          Text('Save Farm'),
+                                          Text(
+                                            'Save Farm',
+                                            style: GoogleFonts.poppins(color: kLightText),
+                                          ),
                                         ],
                                       ),
                               ),
@@ -350,8 +473,8 @@ class _AddFarmPageState extends State<AddFarmPage> {
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

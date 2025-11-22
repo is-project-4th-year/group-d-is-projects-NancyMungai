@@ -9,6 +9,7 @@ import '../../common/widgets/bottom_nav.dart';
 import 'control_panel.dart';
 import 'package:naihydro/src/features/auth/presentation/dashboard_page.dart';
 import 'package:naihydro/src/features/auth/presentation/alerts_page.dart';
+import 'package:naihydro/src/features/auth/presentation/data/auth_service.dart';
 
 // --- CUSTOM THEME COLORS & CONSTANTS ---
 const Color kPrimaryGreen = Color(0xFF558B2F); // A deep, earthy green
@@ -21,12 +22,14 @@ const Color kLightText = Colors.white;
 class FarmDetailsPage extends StatefulWidget {
   final FarmRepository repository;
   final FarmModel farm;
+  final AuthService authService;
 
 
 
   const FarmDetailsPage({
     required this.repository,
     required this.farm,
+    required this.authService,
     Key? key,
   }) : super(key: key);
 
@@ -51,21 +54,24 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
   String _getOverallStatus(Map<String, dynamic> sensors) {
     // Check critical conditions
     final waterLevel = _toDouble(sensors['waterLevel']);
-    final nutrientLevel = _toDouble(
-      sensors['TDS'] ?? sensors['TDS'] ?? sensors['nutrientLevel']
-    );
+   final nutrientLevel = _toDouble(sensors['TDS'] ?? sensors['tds_raw']);
 
     
-    if (waterLevel != null && waterLevel < 20) return 'critical';
-    if (nutrientLevel != null && nutrientLevel < 700) return 'critical';
-    
+ if (waterLevel != null && (waterLevel <= 5.6 || waterLevel > 6.0)) {
+    return 'critical'; // Too low OR too high
+  }
+     if (nutrientLevel != null && nutrientLevel < 700) {
+    return 'critical';
+  }
     // Check warnings
     final ph = _toDouble(sensors['ph']);
     final temp = _toDouble(sensors['temperature']);
     
     if (ph != null && (ph < 6.0 || ph > 7.0)) return 'warning';
     if (temp != null && (temp < 20 || temp > 26)) return 'warning';
-    if (waterLevel != null && waterLevel < 30) return 'warning';
+    if (waterLevel != null && waterLevel > 5.6 && waterLevel <= 6.0) {
+    return 'warning'; // borderline zone
+  }
     if (nutrientLevel != null && (nutrientLevel < 1000 || nutrientLevel > 1800)) return 'warning';
     
     return 'optimal';
@@ -223,6 +229,7 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
                                    context,
                                    MaterialPageRoute(
                                      builder: (_) =>  SettingsPage(
+                                      authService: widget.authService,
                                       onNavigate: (page) {
        
         Navigator.pop(context);
@@ -355,9 +362,7 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
     final ph = _toDouble(sensors['ph']);
     final temp = _toDouble(sensors['temperature']);
     final water = _toDouble(sensors['waterLevel']);
-    final nutrients = _toDouble(
-      sensors['TDS'] ?? sensors['TDS'] ?? sensors['nutrientLevel']
-    );
+    final nutrients = _toDouble(sensors['nutrientLevel'] );
       final humidity = _toDouble(sensors['DHT_humidity'] ?? sensors['humidity']);
     final lastUpdatedStr = _formatTime(_lastUpdateTime);
 
@@ -370,7 +375,9 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
       // and are located in the assets/crops folder.
       cropAssetPath = 'assets/crops/$cropName.png';
     }
-
+print("Nutrient keys: ${sensors.keys}");
+  print("TDS: ${sensors['TDS']}, tds_raw: ${sensors['tds_raw']}, nutrientLevel: ${sensors['nutrientLevel']}");
+  print("Parsed nutrients value: $nutrients");
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -461,13 +468,14 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
                   status: _getWaterStatus(water),
                   lastUpdated: lastUpdatedStr,
                 ),
-                _buildStatusCard(
-                  title: 'Nutrients',
-                  value: nutrients != null ? '${nutrients.toStringAsFixed(0)} ppm' : '-',
-                  icon: Icons.eco,
-                  status: _getNutrientStatus(nutrients),
-                  lastUpdated: lastUpdatedStr,
-                ),
+                    _buildStatusCard(
+                    title: 'Nutrients',
+                    value: nutrients != null ? '${nutrients.toStringAsFixed(0)} ppm' : '-',
+                    icon: Icons.eco,
+                    status: _getNutrientStatus(nutrients),
+                    lastUpdated: lastUpdatedStr,
+                  ),
+
         
                 _buildStatusCard(
                   title: 'Humidity',
@@ -499,37 +507,80 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
               crossAxisSpacing: 12,
               childAspectRatio: 2,
               children: [
-                _buildActionButton(
-                  icon: Icons.bar_chart,
-                  label: 'Analytics',
-                  onTap: () {
-                    // Navigate to analytics
-                  },
-                ),
-                _buildActionButton(
-                  icon: Icons.flash_on,
-                  label: 'Controls',
-                  onTap: () {
-                    // Navigate to controls
-                  },
-                
-                ),
-                _buildActionButton(
-                  icon: Icons.notifications,
-                  label: 'Alerts',
-                  onTap: () {
-                    // Navigate to alerts
-                  },
-                ),
-                _buildActionButton(
-                  icon: Icons.settings,
-                  label: 'Settings',
-                  onTap: () {
-                    // Navigate to settings
-                  },
-                ),
-              ],
+               _buildActionButton(
+      icon: Icons.bar_chart,
+      label: 'Analytics',
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DashboardPage(
+              authService: widget.authService,
+              deviceId: widget.farm.deviceId ?? 'esp32-001',
+              farm: widget.farm,
+              repository: widget.repository,
+              
             ),
+          ),
+        );
+      },
+    ),
+                 _buildActionButton(
+      icon: Icons.flash_on,
+      label: 'Controls',
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ControlPanelPage(
+              farm: widget.farm,
+              repository: widget.repository,
+                authService: widget.authService,
+            ),
+          ),
+        );
+      },
+    ),
+
+                 _buildActionButton(
+      icon: Icons.notifications,
+      label: 'Alerts',
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AlertsPage(
+              deviceId: widget.farm.deviceId ?? 'esp32-001',
+              farm: widget.farm,
+              repository: widget.repository,
+                authService: widget.authService,
+            ),
+          ),
+        );
+      },
+    ),
+            _buildActionButton(
+      icon: Icons.settings,
+      label: 'Settings',
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => SettingsPage(
+              authService: widget.authService, // You'll need to pass this
+              onNavigate: (page) => Navigator.pop(context),
+              onLogout: () {
+                Navigator.pop(context);
+              },
+            ),
+          ),
+        );
+      },
+    ),
+  ],
+),
+            
+            
             SizedBox(height: 80), // Space for bottom nav
           ],
         ),
@@ -626,67 +677,72 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
     );
   }
 
-  Widget _buildBottomNav() {
-    return _buildGlassCard(
-      padding: EdgeInsets.zero,
-      child: Container(
-        decoration: BoxDecoration(
-          // Inner decoration to fine-tune the glass look of the bar
-          color: Colors.white10, 
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
-        ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(Icons.home, 'Home', true, () {
-                  Navigator.of(context).push( MaterialPageRoute(
-        builder: (_) => FarmDetailsPage(repository: _repo, farm: widget.farm),
-      ),
-    );
-                }),
-                _buildNavItem(Icons.notifications, 'Alerts', false, () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => AlertsPage(deviceId: widget.farm.deviceId!),
-                    ),
-                  );
-                }),
-                _buildNavItem(Icons.flash_on, 'Control', false, () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ControlPanelPage(
-                        farm: widget.farm,
-                        repository: widget.repository,
-                      ),
-                    ),
-                  );
-                }),
-                _buildNavItem(Icons.bar_chart, 'Analytics', false, () {
-
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => DashboardPage( deviceId: widget.farm.deviceId!,),
-                    ),
-                  );
-                }),
-              ],
-            ),
-          ),
+Widget _buildBottomNav() {
+  return _buildGlassCard(
+    padding: EdgeInsets.zero,
+    child: Container(
+      decoration: BoxDecoration(
+        color: Colors.white10,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
         ),
       ),
-    );
-  }
-
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(Icons.home, 'Home', true, () {
+                // Already on home (farm details), do nothing
+              }),
+              _buildNavItem(Icons.notifications, 'Alerts', false, () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AlertsPage(
+                      authService: widget.authService,
+                      deviceId: widget.farm.deviceId ?? 'esp32-001',
+                      farm: widget.farm,
+                      repository: widget.repository,
+                    ),
+                  ),
+                );
+              }),
+              _buildNavItem(Icons.flash_on, 'Control', false, () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ControlPanelPage(
+                      authService: widget.authService,
+                      farm: widget.farm,
+                      repository: widget.repository,
+                    ),
+                  ),
+                );
+              }),
+              _buildNavItem(Icons.bar_chart, 'Analytics', false, () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => DashboardPage(
+                      authService: widget.authService,
+                      deviceId: widget.farm.deviceId ?? 'esp32-001',
+                      farm: widget.farm,
+                      repository: widget.repository,
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
   Widget _buildNavItem(IconData icon, String label, bool isActive, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,
@@ -723,17 +779,18 @@ class _FarmDetailsPageState extends State<FarmDetailsPage> {
     return 'warning';
   }
 
-  String _getWaterStatus(double? water) {
-    if (water == null) return 'unknown';
-    if (water > 1) return 'optimal';//shallow farm
-    if (water > 5) return 'warning';
-    return 'critical';
-  }
+String _getWaterStatus(double? water) {
+  if (water == null) return 'unknown';
+
+  if (water <= 5.6 || water > 6.0) return 'critical'; // red
+  if (water > 5.6 && water <= 6.0) return 'warning';  // orange
+  return 'optimal'; // green
+}
 
 String _getNutrientStatus(double? value) {
   if (value == null) return 'unknown';
-  if (value < 500) return 'critical';        // too low
-  if (value >= 500 && value <= 1000) return 'optimal';  // healthy range
+  if (value < 700) return 'critical';        // too low
+  if (value >= 700 && value <= 1000) return 'optimal';  // healthy range
   if (value > 1000 && value <= 1800) return 'warning';  // moderate-high
   if (value > 1800) return 'critical';      // too high
   return 'unknown';

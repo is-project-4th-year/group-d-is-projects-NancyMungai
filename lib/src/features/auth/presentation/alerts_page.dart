@@ -8,6 +8,7 @@ import '../../auth/presentation/control_panel.dart';
 import '../../auth/presentation/models/farm_model.dart';
 import '../../auth/presentation/data/farm_repository.dart';
 import 'farm_details_page.dart';
+import 'package:naihydro/src/features/auth/presentation/data/auth_service.dart';
 
 const Color kPrimaryGreen = Color(0xFF558B2F);
 const Color kAccentGreen = Color(0xFF8BC34A);
@@ -19,12 +20,15 @@ class AlertsPage extends StatefulWidget {
   final String deviceId;
   final FarmModel? farm;
   final FarmRepository? repository;
+  final AuthService authService;
+
 
   const AlertsPage({
     Key? key,
     required this.deviceId,
     this.farm,
     this.repository,
+    required this.authService,
   }) : super(key: key);
 
   @override
@@ -592,68 +596,72 @@ class _AlertsPageState extends State<AlertsPage> {
   }
 
   Widget _buildBottomNav() {
-    return _buildGlassCard(
-      padding: EdgeInsets.zero,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white10,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
+  return _buildGlassCard(
+    padding: EdgeInsets.zero,
+    child: Container(
+      decoration: BoxDecoration(
+        color: Colors.white10,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
         ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(Icons.home, 'Home', false, () {
-                  if (widget.farm != null && widget.repository != null) {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => FarmDetailsPage(
-                          repository: widget.repository!,
-                          farm: widget.farm!,
-                        ),
-                      ),
-                    );
-                  } else {
-                    Navigator.of(context).popUntil((route) => route.isFirst);
-                  }
-                }),
-                _buildNavItem(Icons.notifications, 'Alerts', true, () {}),
-                _buildNavItem(Icons.flash_on, 'Control', false, () {
-                  if (widget.farm != null && widget.repository != null) {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ControlPanelPage(
-                          farm: widget.farm!,
-                          repository: widget.repository!,
-                        ),
-                      ),
-                    );
-                  }
-                }),
-                _buildNavItem(Icons.bar_chart, 'Analytics', false, () {
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(Icons.home, 'Home', false, () {
+                if (widget.farm != null && widget.repository != null) {
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => DashboardPage(deviceId: widget.deviceId),
+                      builder: (_) => FarmDetailsPage(
+                        authService: widget.authService,
+                        repository: widget.repository!,
+                        farm: widget.farm!,
+                      ),
                     ),
                   );
-                }),
-              ],
-            ),
+                }
+              }),
+              _buildNavItem(Icons.notifications, 'Alerts', true, () {}),
+              _buildNavItem(Icons.flash_on, 'Control', false, () {
+                if (widget.farm != null && widget.repository != null) {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ControlPanelPage(
+                        authService: widget.authService,
+                        farm: widget.farm!,
+                        repository: widget.repository!,
+                      ),
+                    ),
+                  );
+                }
+              }),
+              _buildNavItem(Icons.bar_chart, 'Analytics', false, () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => DashboardPage(
+                      authService: widget.authService,
+                      deviceId: widget.deviceId,
+                      farm: widget.farm,
+                      repository: widget.repository,
+                    ),
+                  ),
+                );
+              }),
+            ],
           ),
         ),
       ),
-    );
-  }
-
+    ),
+  );
+}
   Widget _buildNavItem(IconData icon, String label, bool isActive, VoidCallback onTap) {
     return InkWell(
       onTap: onTap,

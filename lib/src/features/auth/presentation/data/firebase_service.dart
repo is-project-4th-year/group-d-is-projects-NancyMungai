@@ -78,7 +78,7 @@ class FirebaseService {
             'ph': sensorData['pH'],
             'temperature': sensorData['DHT_temp'],
             'waterLevel': sensorData['water_level'],
-            'nutrientLevel': _calculateNutrientLevel(sensorData['TDS']),
+            'nutrientLevel':sensorData['TDS'],
             'humidity': sensorData['DHT_humidity'],
             'timestamp': sensorData['timestamp'],
             'updatedAt': sensorData['timestamp'],

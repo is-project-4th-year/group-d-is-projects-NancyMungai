@@ -8,6 +8,7 @@ import '../presentation/models/farm_model.dart';
 import 'package:naihydro/src/features/auth/presentation/dashboard_page.dart';
 import 'package:naihydro/src/features/auth/presentation/alerts_page.dart';
 import 'farm_details_page.dart';
+import 'package:naihydro/src/features/auth/presentation/data/auth_service.dart';
 
 // --- CUSTOM THEME COLORS & CONSTANTS ---
 const Color kPrimaryGreen = Color(0xFF558B2F);
@@ -20,10 +21,12 @@ const Color kLightText = Colors.white;
 class ControlPanelPage extends StatefulWidget {
   final FarmModel farm;
   final FarmRepository repository;
+   final AuthService authService;
 
   const ControlPanelPage({
     required this.farm,
     required this.repository,
+    required this.authService,
     Key? key,
   }) : super(key: key);
 
@@ -411,51 +414,70 @@ class _ControlPanelPageState extends State<ControlPanelPage> {
     );
   }
 
-  Widget _buildBottomNav() {
-    return _buildGlassCard(
-      padding: EdgeInsets.zero,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white10,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
+Widget _buildBottomNav() {
+  return _buildGlassCard(
+    padding: EdgeInsets.zero,
+    child: Container(
+      decoration: BoxDecoration(
+        color: Colors.white10,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
         ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(Icons.home, 'Home', false, () {
-                  Navigator.of(context).popUntil((route) => route.isFirst);
-                }),
-                _buildNavItem(Icons.notifications, 'Alerts', false, () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => AlertsPage(deviceId: widget.farm.deviceId!),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(Icons.home, 'Home', false, () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => FarmDetailsPage(
+                        authService: widget.authService,
+                      repository: widget.repository,
+                      farm: widget.farm,
                     ),
-                  );
-                }),
-                _buildNavItem(Icons.flash_on, 'Control', true, () {}),
-                _buildNavItem(Icons.bar_chart, 'Analytics', false, () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => DashboardPage(deviceId: widget.farm.deviceId!),
+                  ),
+                );
+              }),
+              _buildNavItem(Icons.notifications, 'Alerts', false, () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AlertsPage(
+                      authService: widget.authService,
+                      deviceId: widget.farm.deviceId ?? 'esp32-001',
+                      farm: widget.farm,
+                      repository: widget.repository,
                     ),
-                  );
-                }),
-              ],
-            ),
+                  ),
+                );
+              }),
+              _buildNavItem(Icons.flash_on, 'Control', true, () {}),
+              _buildNavItem(Icons.bar_chart, 'Analytics', false, () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => DashboardPage(
+                      authService: widget.authService,
+                      deviceId: widget.farm.deviceId ?? 'esp32-001',
+                      farm: widget.farm,
+                      repository: widget.repository,
+                    ),
+                  ),
+                );
+              }),
+            ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildNavItem(IconData icon, String label, bool isActive, VoidCallback onTap) {
     return InkWell(

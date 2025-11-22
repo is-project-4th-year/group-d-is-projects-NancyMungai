@@ -1,4 +1,3 @@
-// lib/src/features/home/presentation/home_page.dart
 import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -6,9 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 import 'package:naihydro/src/features/auth/presentation/data/auth_service.dart';
-import 'package:naihydro/src/features/auth/presentation/dashboard_page.dart';
-import 'package:naihydro/src/features/auth/presentation/alerts_page.dart';
-import 'package:naihydro/src/features/auth/presentation/control_panel.dart';
 import 'package:naihydro/src/features/auth/presentation/settings_page.dart';
 import '../presentation/data/farm_repository.dart';
 import '../presentation/models/farm_model.dart';
@@ -46,7 +42,6 @@ class _HomePageState extends State<HomePage> {
     _loadUserName();
   }
 
-  // Load user name from Firebase
   Future<void> _loadUserName() async {
     final uid = widget.authService.currentUser?.uid;
     if (uid != null) {
@@ -74,12 +69,11 @@ class _HomePageState extends State<HomePage> {
   void _openFarmDetails(FarmModel farm) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => FarmDetailsPage(repository: _repo, farm: farm),
+        builder: (_) => FarmDetailsPage(authService: widget.authService,repository: _repo, farm: farm),
       ),
     );
   }
 
-  // Edit farm dialog
   void _openEditFarm(FarmModel farm) {
     final nameCtrl = TextEditingController(text: farm.name);
     final locationCtrl = TextEditingController(text: farm.location);
@@ -177,6 +171,80 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  void _deleteFarm(FarmModel farm) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: kBackgroundColor.withOpacity(0.9),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Delete Farm',
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.bold,
+            color: Colors.red[600],
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.warning_rounded, color: Colors.red[600], size: 48),
+            const SizedBox(height: 16),
+            Text(
+              'Are you sure you want to delete "${farm.name}"?',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w500,
+                color: kDarkText,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'This action cannot be undone.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                color: Colors.red[600],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: GoogleFonts.poppins(color: kPrimaryGreen)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              try {
+                final uid = widget.authService.currentUser?.uid;
+                if (uid != null) {
+                  await _database.ref('users/$uid/farms/${farm.id}').remove();
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Farm deleted successfully'),
+                      backgroundColor: Colors.red[600],
+                    ),
+                  );
+                }
+              } catch (e) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error deleting farm: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red[600]),
+            child: Text('Delete', style: GoogleFonts.poppins(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildGlassCard({required Widget child, EdgeInsetsGeometry? padding}) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
@@ -251,11 +319,22 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     Align(
                       alignment: Alignment.topRight,
-                      child: IconButton(
-                        icon: Icon(Icons.edit, color: kLightText.withOpacity(0.8), size: 20),
-                        onPressed: () => _openEditFarm(farm),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          IconButton(
+                            icon: Icon(Icons.edit, color: kLightText.withOpacity(0.8), size: 20),
+                            onPressed: () => _openEditFarm(farm),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.delete, color: Colors.red[300], size: 20),
+                            onPressed: () => _deleteFarm(farm),
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(),
+                          ),
+                        ],
                       ),
                     ),
                     Column(
@@ -288,36 +367,17 @@ class _HomePageState extends State<HomePage> {
                         _buildQuickActionIcon(
                           Icons.bar_chart,
                           'Analytics',
-                          () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => DashboardPage(deviceId: farm.deviceId ?? 'esp32-001'),
-                            ),
-                          ),
+                          () => _openFarmDetails(farm),
                         ),
                         _buildQuickActionIcon(
                           Icons.flash_on,
                           'Control',
-                          () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ControlPanelPage(farm: farm, repository: _repo),
-                            ),
-                          ),
+                          () => _openFarmDetails(farm),
                         ),
                         _buildQuickActionIcon(
                           Icons.notifications,
                           'Alerts',
-                          () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => AlertsPage(
-                                deviceId: farm.deviceId ?? 'esp32-001',
-                                farm: farm,
-                                repository: _repo,
-                              ),
-                            ),
-                          ),
+                          () => _openFarmDetails(farm),
                         ),
                       ],
                     ),
@@ -428,36 +488,27 @@ class _HomePageState extends State<HomePage> {
                     style: GoogleFonts.poppins(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: kDarkText,
+                      color: kLightText,
                     ),
                   ),
                   Text(
                     'Welcome back, $_userName',
                     style: GoogleFonts.poppins(
                       fontSize: 12,
-                      color: kDarkText.withOpacity(0.7),
+                      color: kLightText.withOpacity(0.8),
                     ),
                   ),
                 ],
               ),
             ),
             IconButton(
-              icon: Icon(Icons.notifications_none, color: kDarkText),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => AlertsPage(deviceId: 'esp32-001'),
-                  ),
-                );
-              },
-            ),
-            IconButton(
-              icon: Icon(Icons.settings, color: kDarkText),
+              icon: Icon(Icons.settings, color: kLightText),
               onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => SettingsPage(
+                      authService: widget.authService,
                       onNavigate: (page) => Navigator.pop(context),
                       onLogout: () async {
                         if (widget.onSignOut != null) await widget.onSignOut!();
@@ -477,84 +528,96 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kBackgroundColor,
-      body: Column(
-        children: [
-          _buildHeader(),
-          Expanded(
-            child: StreamBuilder<List<FarmModel>>(
-              stream: _farmsStream,
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      'Error loading farms: ${snapshot.error}',
-                      style: GoogleFonts.poppins(color: Colors.red),
-                    ),
-                  );
-                }
-
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final farms = snapshot.data ?? [];
-
-                if (farms.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'No farms yet',
-                            style: GoogleFonts.poppins(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: kDarkText,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Add your first farm and link your ESP32 device.',
-                            style: GoogleFonts.poppins(
-                              color: kDarkText.withOpacity(0.7),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            height: 150,
-                            width: 150,
-                            child: _buildAddFarmCard(),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-
-                return GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 0.9,
-                  ),
-                  itemCount: farms.length + 1,
-                  itemBuilder: (context, index) {
-                    if (index == farms.length) {
-                      return _buildAddFarmCard();
-                    }
-                    final farm = farms[index];
-                    return _buildFarmCard(farm);
-                  },
-                );
-              },
-            ),
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: BoxDecoration(
+          color: kBackgroundColor,
+          image: const DecorationImage(
+            image: AssetImage('assets/images/detailspg.jpeg'),
+            fit: BoxFit.cover,
           ),
-        ],
+        ),
+        child: Column(
+          children: [
+            _buildHeader(),
+            Expanded(
+              child: StreamBuilder<List<FarmModel>>(
+                stream: _farmsStream,
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text(
+                        'Error loading farms: ${snapshot.error}',
+                        style: GoogleFonts.poppins(color: Colors.red),
+                      ),
+                    );
+                  }
+
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(color: kPrimaryGreen),
+                    );
+                  }
+
+                  final farms = snapshot.data ?? [];
+
+                  if (farms.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'No farms yet',
+                              style: GoogleFonts.poppins(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: kLightText,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Add your first farm and link your ESP32 device.',
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.poppins(
+                                color: kLightText.withOpacity(0.7),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              height: 150,
+                              width: 150,
+                              child: _buildAddFarmCard(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  return GridView.builder(
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      childAspectRatio: 0.9,
+                    ),
+                    itemCount: farms.length + 1,
+                    itemBuilder: (context, index) {
+                      if (index == farms.length) {
+                        return _buildAddFarmCard();
+                      }
+                      final farm = farms[index];
+                      return _buildFarmCard(farm);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

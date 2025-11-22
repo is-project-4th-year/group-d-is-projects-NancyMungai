@@ -4,6 +4,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:naihydro/src/features/auth/presentation/data/auth_service.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
@@ -24,12 +25,14 @@ class DashboardPage extends StatefulWidget {
   final String deviceId;
   final FarmModel? farm;
   final FarmRepository? repository;
+  final AuthService authService;
 
   const DashboardPage({
     Key? key,
     required this.deviceId,
     this.farm,
     this.repository,
+    required this.authService,
   }) : super(key: key);
 
   @override
@@ -582,7 +585,7 @@ Future<void> _loadCurrentDataAndGenerate() async {
                       selected: selected,
                       onSelected: (_) => _onTimeRangeChanged(r),
                       selectedColor: kPrimaryGreen,
-                      backgroundColor: Colors.white24,
+                      backgroundColor: kPrimaryGreen.withOpacity(1),
                       labelStyle: GoogleFonts.poppins(
                         color: selected ? Colors.white : Colors.white70,
                         fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
@@ -627,6 +630,7 @@ Future<void> _loadCurrentDataAndGenerate() async {
                           _buildLineChart('Water Level Over Time', 'waterLevel', Colors.cyan[300]!, 0, 100),
                           const SizedBox(height: 12),
                           _buildLineChart('Nutrient Levels Over Time', 'nutrientLevel', kAccentGreen, 400.0, 2000.0),
+                            _buildLineChart('Humidity Levels Over Time', 'humidityLevel', kAccentGreen, 400.0, 2000.0),
 
                           const SizedBox(height: 16),
 
@@ -680,72 +684,73 @@ Future<void> _loadCurrentDataAndGenerate() async {
     );
   }
 
-  Widget _buildBottomNav() {
-    return _buildGlassCard(
-      padding: EdgeInsets.zero,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white10,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
+Widget _buildBottomNav() {
+  return _buildGlassCard(
+    padding: EdgeInsets.zero,
+    child: Container(
+      decoration: BoxDecoration(
+        color: Colors.white10,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
         ),
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(Icons.home, 'Home', false, () {
-                  if (widget.farm != null && widget.repository != null) {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => FarmDetailsPage(
-                          repository: widget.repository!,
-                          farm: widget.farm!,
-                        ),
-                      ),
-                    );
-                  } else {
-                    Navigator.of(context).popUntil((route) => route.isFirst);
-                  }
-                }),
-                _buildNavItem(Icons.notifications, 'Alerts', false, () {
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(Icons.home, 'Home', false, () {
+                // Navigate back to farm details
+                if (widget.farm != null && widget.repository != null) {
                   Navigator.pushReplacement(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => AlertsPage(
-                        deviceId: widget.deviceId,
-                        farm: widget.farm,
-                        repository: widget.repository,
+                      builder: (_) => FarmDetailsPage(
+                        repository: widget.repository!,
+                        farm: widget.farm!,  authService: widget.authService,
                       ),
                     ),
                   );
-                }),
-                _buildNavItem(Icons.flash_on, 'Control', false, () {
-                  if (widget.farm != null && widget.repository != null) {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => ControlPanelPage(
-                          farm: widget.farm!,
-                          repository: widget.repository!,
-                        ),
+                }
+              }),
+              _buildNavItem(Icons.notifications, 'Alerts', false, () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AlertsPage(
+                      authService: widget.authService,
+                      deviceId: widget.deviceId,
+                      farm: widget.farm,
+                      repository: widget.repository,
+                    ),
+                  ),
+                );
+              }),
+              _buildNavItem(Icons.flash_on, 'Control', false, () {
+                if (widget.farm != null && widget.repository != null) {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ControlPanelPage(
+                          authService: widget.authService,
+                        farm: widget.farm!,
+                        repository: widget.repository!,
                       ),
-                    );
-                  }
-                }),
-                _buildNavItem(Icons.bar_chart, 'Analytics', true, () {}),
-              ],
-            ),
+                    ),
+                  );
+                }
+              }),
+              _buildNavItem(Icons.bar_chart, 'Analytics', true, () {}),
+            ],
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildNavItem(IconData icon, String label, bool isActive, VoidCallback onTap) {
     return InkWell(

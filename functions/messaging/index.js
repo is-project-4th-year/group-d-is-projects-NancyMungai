@@ -237,13 +237,13 @@ function checkThresholds(sensorReadings, mlPrediction) {
     alerts.push({
       type: "ph_critical_low",
       title: "🔴 pH CRITICAL: Too Acidic",
-      body: `pH: ${ph.toFixed(1)} - Add base to raise pH immediately`,
+      body: `pH: ${ph.toFixed(1)} - raise pH immediately`,
     });
   } else if (ph > 0 && ph > 8.5) {
     alerts.push({
       type: "ph_critical_high",
       title: "🔴 pH CRITICAL: Too Alkaline",
-      body: `pH: ${ph.toFixed(1)} - Add acid to lower pH immediately`,
+      body: `pH: ${ph.toFixed(1)} - lower pH immediately`,
     });
   } else if (ph > 0 && (ph < 6.0 || ph > 8.0)) {
     alerts.push({
@@ -293,8 +293,7 @@ function checkThresholds(sensorReadings, mlPrediction) {
 }
 
 /**
- * Test notification - SAME REGION
- */
+ * Test notification - */
 exports.testNotification = functions
   .region("europe-west1")
   .https.onCall(async (data, context) => {

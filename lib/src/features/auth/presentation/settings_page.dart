@@ -1,6 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:naihydro/src/features/auth/presentation/data/auth_service.dart';
 
 // --- SHARED THEME COLORS ---
 const Color kPrimaryGreen = Color(0xFF558B2F);
@@ -8,15 +10,18 @@ const Color kAccentGreen = Color(0xFF8BC34A);
 const Color kBackgroundColor = Color(0xFFC7CEC8);
 const Color kCardColor = Colors.white10;
 const Color kDarkText = Colors.white70;
+const Color kLightText = Colors.white;
 
 class SettingsPage extends StatefulWidget {
+  final AuthService authService;
   final Function(String page) onNavigate;
   final VoidCallback onLogout;
 
   const SettingsPage({
     super.key,
-     required this.onNavigate,
-     required this.onLogout,
+    required this.authService,
+    required this.onNavigate,
+    required this.onLogout,
   });
 
   @override
@@ -24,16 +29,138 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
+  final _database = FirebaseDatabase.instance;
+  
+  // User data
+  String _userName = 'Loading...';
+  String _userEmail = '';
+  
   Map<String, dynamic> settings = {
     "notifications": true,
     "lowWaterAlerts": true,
     "temperatureAlerts": true,
     "phAlerts": true,
-    "soundAlerts": true,
     "autoRefresh": true,
     "refreshInterval": 30.0,
     "darkMode": false
   };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserData();
+  }
+
+  Future<void> _loadUserData() async {
+    final uid = widget.authService.currentUser?.uid;
+    final email = widget.authService.currentUser?.email;
+    
+    if (uid != null) {
+      try {
+        final snapshot = await _database.ref('users/$uid/profile/name').get();
+        if (snapshot.exists && mounted) {
+          setState(() {
+            _userName = snapshot.value.toString();
+            _userEmail = email ?? 'No email';
+          });
+        } else {
+          setState(() {
+            _userName = 'User';
+            _userEmail = email ?? 'No email';
+          });
+        }
+      } catch (e) {
+        print('Error loading user data: $e');
+        setState(() {
+          _userName = 'User';
+          _userEmail = email ?? 'No email';
+        });
+      }
+    }
+  }
+
+  void _showEditProfileDialog() {
+    final nameController = TextEditingController(text: _userName);
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: kBackgroundColor,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Edit Profile',
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.bold,
+            color: kDarkText,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              style: GoogleFonts.poppins(color: kDarkText),
+              decoration: InputDecoration(
+                labelText: 'Name',
+                labelStyle: GoogleFonts.poppins(color: kDarkText.withOpacity(0.7)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.1),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: TextEditingController(text: _userEmail),
+              enabled: false,
+              style: GoogleFonts.poppins(color: kDarkText.withOpacity(0.5)),
+              decoration: InputDecoration(
+                labelText: 'Email (cannot be changed)',
+                labelStyle: GoogleFonts.poppins(color: kDarkText.withOpacity(0.7)),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                filled: true,
+                fillColor: Colors.white.withOpacity(0.05),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancel', style: GoogleFonts.poppins(color: kDarkText)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final uid = widget.authService.currentUser?.uid;
+              if (uid != null && nameController.text.trim().isNotEmpty) {
+                try {
+                  await _database.ref('users/$uid/profile/name').set(nameController.text.trim());
+                  setState(() {
+                    _userName = nameController.text.trim();
+                  });
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Profile updated successfully'),
+                      backgroundColor: kPrimaryGreen,
+                    ),
+                  );
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Error updating profile: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: kPrimaryGreen),
+            child: Text('Save', style: GoogleFonts.poppins(color: kLightText)),
+          ),
+        ],
+      ),
+    );
+  }
 
   void update(String key, dynamic value) {
     setState(() => settings[key] = value);
@@ -85,7 +212,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 children: [
                   IconButton(
                     icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: () => widget.onNavigate("home"),
+                    onPressed: () => Navigator.pop(context),
                   ),
                   Text(
                     "Settings",
@@ -114,19 +241,21 @@ class _SettingsPageState extends State<SettingsPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text("John Farmer",
-                                style: GoogleFonts.poppins(
-                                    fontSize: 16, color: kDarkText)),
-                            Text("farmer@example.com",
-                                style: GoogleFonts.poppins(
-                                    fontSize: 14, color: Colors.white70)),
-                          ],
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(_userName,
+                                  style: GoogleFonts.poppins(
+                                      fontSize: 16, color: kDarkText)),
+                              Text(_userEmail,
+                                  style: GoogleFonts.poppins(
+                                      fontSize: 14, color: Colors.white70)),
+                            ],
+                          ),
                         ),
                         ElevatedButton(
-                          onPressed: () {},
+                          onPressed: _showEditProfileDialog,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: kAccentGreen.withOpacity(0.8),
                           ),
@@ -134,11 +263,6 @@ class _SettingsPageState extends State<SettingsPage> {
                         )
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    Text("Farm Name", style: GoogleFonts.poppins(color: kDarkText)),
-                    Text("My Hydroponic Farm",
-                        style: GoogleFonts.poppins(
-                            fontSize: 14, color: Colors.white70)),
                   ],
                 ),
               ),
@@ -164,9 +288,6 @@ class _SettingsPageState extends State<SettingsPage> {
                         disabled: !settings["notifications"]),
 
                     _switchTile("pH Alerts", "phAlerts",
-                        disabled: !settings["notifications"]),
-
-                    _switchTile("Sound Alerts", "soundAlerts",
                         disabled: !settings["notifications"]),
                   ],
                 ),
@@ -204,7 +325,14 @@ class _SettingsPageState extends State<SettingsPage> {
 
                     const SizedBox(height: 10),
                     ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Syncing data...'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                      },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: kAccentGreen.withOpacity(0.9),
                       ),
@@ -216,11 +344,6 @@ class _SettingsPageState extends State<SettingsPage> {
 
               const SizedBox(height: 20),
 
-   
-
-              const SizedBox(height: 20),
-
-      
               // ABOUT
               glassCard(
                 child: Column(
@@ -260,8 +383,6 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         ),
       ),
-
-      // BOTTOM NAV 
     );
   }
 
@@ -301,13 +422,6 @@ class _SettingsPageState extends State<SettingsPage> {
         Text(value,
             style: GoogleFonts.poppins(color: Colors.white70)),
       ],
-    );
-  }
-
-  Widget _navButton(IconData icon, String page) {
-    return IconButton(
-      icon: Icon(icon, color: Colors.white),
-      onPressed: () => widget.onNavigate(page),
     );
   }
 }
