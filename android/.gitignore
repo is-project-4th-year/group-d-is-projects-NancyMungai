@@ -12,3 +12,6 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+# Ignore service account files
+functions/ml_model/naihydro-d62ba461064f.json
+*.json
