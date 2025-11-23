@@ -49,7 +49,9 @@ class _AlertsPageState extends State<AlertsPage> {
   }
 
   Stream<List<Map<String, dynamic>>> _getAlertsStream() {
-    return _database.ref('alerts/${widget.deviceId}').onValue.map((event) {
+    return _database.ref('alerts/${widget.deviceId}')
+    .limitToLast(50) 
+    .onValue.map((event) {
       if (!event.snapshot.exists) return [];
 
       final data = event.snapshot.value as Map?;
@@ -75,8 +77,12 @@ class _AlertsPageState extends State<AlertsPage> {
         }
       });
 
-      alerts.sort((a, b) => (b['timestamp'] as DateTime).compareTo(a['timestamp'] as DateTime));
-      return alerts;
+          alerts.sort((a, b) => 
+        (b['timestamp'] as DateTime).compareTo(a['timestamp'] as DateTime)
+      );
+      
+      // Return only the top 50
+      return alerts.take(50).toList();
     });
   }
 
@@ -248,8 +254,23 @@ class _AlertsPageState extends State<AlertsPage> {
                     children: [
                       IconButton(
                         icon: Icon(Icons.arrow_back, color: kLightText),
-                        onPressed: () => Navigator.of(context).pop(),
-                      ),
+                          onPressed: () {
+                        if (widget.farm != null && widget.repository != null) {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => FarmDetailsPage(
+                                authService: widget.authService,
+                                repository: widget.repository!,
+                                farm: widget.farm!,
+                              ),
+                            ),
+                          );
+                        } else {
+                          Navigator.of(context).pop();
+                        }
+                      },
+                    ),
                       Icon(Icons.notifications, color: kPrimaryGreen, size: 32),
                       SizedBox(width: 8),
                       Expanded(

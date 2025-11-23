@@ -48,12 +48,12 @@ class _DashboardPageState extends State<DashboardPage> {
   bool _isLoading = true;
 
   double? _toDouble(dynamic value) {
-  if (value == null) return null;
-  if (value is double) return value;
-  if (value is int) return value.toDouble();
-  if (value is String) return double.tryParse(value);
-  return null;
-}
+    if (value == null) return null;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
+  }
 
   @override
   void initState() {
@@ -76,121 +76,122 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
-Future<void> _loadHistoricalData() async {
-  try {
-    setState(() => _isLoading = true);
+  Future<void> _loadHistoricalData() async {
+    try {
+      setState(() => _isLoading = true);
 
-    // Calculate time range
-    final now = DateTime.now();
-    int hours = _timeRange == '24h' ? 24 : 0;
-    int days = _timeRange == '24h' ? 0 : (_timeRange == '7d' ? 7 : 30);
-    final startTime = now.subtract(Duration(hours: hours, days: days));
-    final startTimestamp = startTime.millisecondsSinceEpoch;
+      final now = DateTime.now();
+      int hours = _timeRange == '24h' ? 24 : 0;
+      int days = _timeRange == '24h' ? 0 : (_timeRange == '7d' ? 7 : 30);
+      final startTime = now.subtract(Duration(hours: hours, days: days));
+      final startTimestamp = startTime.millisecondsSinceEpoch;
 
-    print('📊 Fetching historical data from ${startTime.toIso8601String()}');
-    print('   Device: ${widget.deviceId}');
-    print('   Start timestamp: $startTimestamp');
+      print('📊 Fetching historical data from ${startTime.toIso8601String()}');
 
-    // Query historical data from Firebase
-    final snapshot = await _database
-        .ref('history/${widget.deviceId}')
-        .orderByKey()
-        .startAt(startTimestamp.toString())
-        .get();
+      final snapshot = await _database
+          .ref('history/${widget.deviceId}')
+          .orderByKey()
+          .startAt(startTimestamp.toString())
+          .get();
 
-    if (snapshot.exists) {
-      final historyData = snapshot.value as Map?;
-      
-      if (historyData != null && historyData.isNotEmpty) {
-        print('✅ Found ${historyData.length} historical records');
-        
-        List<Map<String, dynamic>> parsedData = [];
-        
-        historyData.forEach((key, value) {
-          if (value is Map) {
-            try {
-              // Parse timestamp from key (milliseconds)
-              final timestamp = DateTime.fromMillisecondsSinceEpoch(int.parse(key));
-              
-              parsedData.add({
-                'timestamp': timestamp,
-                'time': _timeRange == '24h'
-                    ? '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}'
-                    : '${timestamp.month}/${timestamp.day}',
-                'pH': _toDouble(value['pH']) ?? 6.5,
-                'temperature': _toDouble(value['DHT_temp']) ?? 24.0,
-                'waterLevel': _toDouble(value['water_level']) ?? 50.0,
-                'nutrientLevel': _toDouble(value['TDS']) ?? 1000.0,
-              });
-            } catch (e) {
-              print('⚠️ Error parsing entry $key: $e');
+      if (snapshot.exists) {
+        final historyData = snapshot.value as Map?;
+
+        if (historyData != null && historyData.isNotEmpty) {
+          print('✅ Found ${historyData.length} historical records');
+
+          List<Map<String, dynamic>> parsedData = [];
+
+          historyData.forEach((key, value) {
+            if (value is Map) {
+              try {
+                final timestamp = DateTime.fromMillisecondsSinceEpoch(int.parse(key));
+
+                parsedData.add({
+                  'timestamp': timestamp,
+                  'time': _timeRange == '24h'
+                      ? '${timestamp.hour.toString().padLeft(2, '0')}:00'
+                      : _timeRange == '7d'
+                          ? _getDayLabel(timestamp)
+                          : '${timestamp.month}/${timestamp.day}',
+                  'pH': _toDouble(value['pH'] ?? value['ph']) ?? 6.5,
+                  'temperature':
+                      _toDouble(value['DHT_temp'] ?? value['temperature'] ?? value['temp']) ?? 24.0,
+                  'waterLevel': _toDouble(value['water_level'] ?? value['waterLevel']) ?? 50.0,
+                  'nutrientLevel':
+                      _toDouble(value['TDS'] ?? value['tds'] ?? value['nutrientLevel']) ?? 1000.0,
+                  'humidityLevel': _toDouble(value['DHT_humidity'] ?? value['humidity']) ?? 60.0,
+                });
+              } catch (e) {
+                print('⚠️ Error parsing entry $key: $e');
+              }
             }
-          }
-        });
-        
-        // Sort by timestamp
-        parsedData.sort((a, b) => 
-          (a['timestamp'] as DateTime).compareTo(b['timestamp'] as DateTime)
-        );
-        
-        if (parsedData.length < 5) {
-          print('⚠️ Not enough historical data (${parsedData.length} points), generating sample data');
-          _loadCurrentDataAndGenerate();
-        } else {
-          setState(() {
-            _data = parsedData;
-            _calculateMetrics();
           });
-          print('✅ Loaded ${parsedData.length} data points for ${_timeRange}');
+
+          parsedData.sort((a, b) =>
+              (a['timestamp'] as DateTime).compareTo(b['timestamp'] as DateTime));
+
+          if (parsedData.length < 3) {
+            print('⚠️ Not enough data, generating supplementary data');
+            _loadCurrentDataAndGenerate();
+          } else {
+            setState(() {
+              _data = parsedData;
+              _calculateMetrics();
+            });
+            print('✅ Loaded ${parsedData.length} data points');
+          }
+        } else {
+          _loadCurrentDataAndGenerate();
         }
       } else {
-        print('⚠️ No historical data available, using current data + generation');
         _loadCurrentDataAndGenerate();
       }
-    } else {
-      print('⚠️ No history node exists yet, using current data + generation');
+
+      setState(() => _isLoading = false);
+    } catch (e) {
+      print('❌ Error: $e');
+      setState(() => _isLoading = false);
       _loadCurrentDataAndGenerate();
     }
-
-    setState(() => _isLoading = false);
-  } catch (e) {
-    print('❌ Error loading historical data: $e');
-    setState(() => _isLoading = false);
-    _loadCurrentDataAndGenerate();
   }
-}
 
+  String _getDayLabel(DateTime date) {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return days[date.weekday % 7];
+  }
 
-// Fallback: Load current data and generate historical estimates
-Future<void> _loadCurrentDataAndGenerate() async {
-  try {
-    final snapshot = await _database.ref('processed/${widget.deviceId}').get();
+  Future<void> _loadCurrentDataAndGenerate() async {
+    try {
+      final snapshot = await _database.ref('processed/${widget.deviceId}').get();
 
-    if (snapshot.exists) {
-      final data = snapshot.value as Map?;
-      if (data != null) {
-        _generateDataFromFirebase(Map<String, dynamic>.from(data));
+      if (snapshot.exists) {
+        final data = snapshot.value as Map?;
+        if (data != null) {
+          _generateDataFromFirebase(Map<String, dynamic>.from(data));
+        } else {
+          _generateHistoricalData(_timeRange);
+        }
       } else {
         _generateHistoricalData(_timeRange);
       }
-    } else {
+    } catch (e) {
+      print('❌ Error loading current data: $e');
       _generateHistoricalData(_timeRange);
     }
-  } catch (e) {
-    print('❌ Error loading current data: $e');
-    _generateHistoricalData(_timeRange);
   }
-}
+
   void _generateDataFromFirebase(Map<String, dynamic> latestData) {
     final now = DateTime.now();
     List<Map<String, dynamic>> generatedData = [];
 
     int intervals = _timeRange == '24h' ? 24 : _timeRange == '7d' ? 7 : 30;
 
-    final basePh = double.tryParse(latestData['pH'].toString()) ?? 6.5;
-    final baseTemp = double.tryParse(latestData['DHT_temp'].toString()) ?? 24.0;
-    final baseWater = double.tryParse(latestData['water_level'].toString()) ?? 50.0;
-    final baseTds = double.tryParse(latestData['TDS'].toString()) ?? 1000.0;
+    final basePh = double.tryParse(latestData['pH']?.toString() ?? latestData['ph']?.toString() ?? '') ?? 6.5;
+    final baseTemp = double.tryParse(latestData['DHT_temp']?.toString() ?? latestData['temperature']?.toString() ?? '') ?? 24.0;
+    final baseWater = double.tryParse(latestData['water_level']?.toString() ?? latestData['waterLevel']?.toString() ?? '') ?? 50.0;
+    final baseTds = double.tryParse(latestData['TDS']?.toString() ?? latestData['nutrientLevel']?.toString() ?? '') ?? 1000.0;
+    final baseHumidity = double.tryParse(latestData['DHT_humidity']?.toString() ?? latestData['humidity']?.toString() ?? '') ?? 60.0;
 
     final random = Random();
 
@@ -204,11 +205,14 @@ Future<void> _loadCurrentDataAndGenerate() async {
         'timestamp': time,
         'time': _timeRange == '24h'
             ? '${time.hour.toString().padLeft(2, '0')}:00'
-            : '${time.month}/${time.day}',
-        'pH': (basePh + (random.nextDouble() - 0.5) * 1.0).clamp(5.5, 8.0),
+            : _timeRange == '7d'
+                ? _getDayLabel(time)
+                : '${time.month}/${time.day}',
+        'pH': (basePh + (random.nextDouble() - 0.5) * 1.0).clamp(7, 12.0),
         'temperature': (baseTemp + (random.nextDouble() - 0.5) * 4).clamp(15.0, 32.0),
         'waterLevel': (baseWater + (random.nextDouble() - 0.5) * 10).clamp(0.0, 100.0),
-        'nutrientLevel': (baseTds + (random.nextDouble() - 0.5) * 200).clamp(400.0, 2000.0),
+        'nutrientLevel': (baseTds + (random.nextDouble() - 0.5) * 200).clamp(10.0, 700.0),
+        'humidityLevel': (baseHumidity + (random.nextDouble() - 0.5) * 10).clamp(100.0, 90.0),
       });
     }
 
@@ -233,11 +237,14 @@ Future<void> _loadCurrentDataAndGenerate() async {
         'timestamp': time,
         'time': range == '24h'
             ? '${time.hour.toString().padLeft(2, '0')}:00'
-            : '${time.month}/${time.day}',
+            : range == '7d'
+                ? _getDayLabel(time)
+                : '${time.month}/${time.day}',
         'pH': 6.0 + random.nextDouble() * 1.5,
         'temperature': 22 + random.nextDouble() * 6,
         'waterLevel': 70 + random.nextDouble() * 25,
-        'nutrientLevel': 60 + random.nextDouble() * 30,
+        'nutrientLevel': 1000 + random.nextDouble() * 500,
+        'humidityLevel': 60 + random.nextDouble() * 20,
       });
     }
 
@@ -260,6 +267,11 @@ Future<void> _loadCurrentDataAndGenerate() async {
     final avgWater = waterValues.reduce((a, b) => a + b) / waterValues.length;
     final avgNutrient = nutrientValues.reduce((a, b) => a + b) / nutrientValues.length;
 
+    final phChange = _calculateChange(phValues.last, phValues.first);
+    final tempChange = _calculateChange(tempValues.last, tempValues.first);
+    final waterChange = _calculateChange(waterValues.last, waterValues.first);
+    final nutrientChange = _calculateChange(nutrientValues.last, nutrientValues.first);
+
     _historicalMetrics = {
       'avgPh': avgPh.toStringAsFixed(2),
       'avgTemp': avgTemp.toStringAsFixed(1),
@@ -269,11 +281,21 @@ Future<void> _loadCurrentDataAndGenerate() async {
       'tempTrend': tempValues.last > tempValues.first ? 'up' : 'down',
       'waterTrend': waterValues.last > waterValues.first ? 'up' : 'down',
       'nutrientTrend': nutrientValues.last > nutrientValues.first ? 'up' : 'down',
+      'phChange': phChange,
+      'tempChange': tempChange,
+      'waterChange': waterChange,
+      'nutrientChange': nutrientChange,
       'minPh': phValues.reduce(min).toStringAsFixed(2),
       'maxPh': phValues.reduce(max).toStringAsFixed(2),
       'minTemp': tempValues.reduce(min).toStringAsFixed(1),
       'maxTemp': tempValues.reduce(max).toStringAsFixed(1),
     };
+  }
+
+  String _calculateChange(double current, double previous) {
+    if (previous == 0) return '0%';
+    final change = ((current - previous) / previous * 100);
+    return '${change > 0 ? '+' : ''}${change.toStringAsFixed(1)}%';
   }
 
   void _onTimeRangeChanged(String newRange) {
@@ -286,21 +308,25 @@ Future<void> _loadCurrentDataAndGenerate() async {
 
   Future<void> _exportData() async {
     try {
-      String csv = 'Timestamp,Time,pH,Temperature (°C),Water Level (%),Nutrient Level (ppm)\n';
+      String csv =
+          'Timestamp,Time,pH,Temperature (°C),Water Level (cm),Nutrient Level (ppm),Humidity (%)\n';
 
       for (var entry in _data) {
         csv +=
-            '${entry['timestamp']},${entry['time']},${(entry['pH'] as double).toStringAsFixed(2)},${(entry['temperature'] as double).toStringAsFixed(1)},${(entry['waterLevel'] as double).toStringAsFixed(1)},${(entry['nutrientLevel'] as double).toStringAsFixed(0)}\n';
+            '${entry['timestamp']},${entry['time']},${(entry['pH'] as double).toStringAsFixed(2)},${(entry['temperature'] as double).toStringAsFixed(1)},${(entry['waterLevel'] as double).toStringAsFixed(1)},${(entry['nutrientLevel'] as double).toStringAsFixed(0)},${(entry['humidityLevel'] as double).toStringAsFixed(0)}\n';
       }
 
       final directory = await getTemporaryDirectory();
-      final fileName = 'naihydro_export_${DateTime.now().millisecondsSinceEpoch}.csv';
+      final farmName = widget.farm?.name ?? 'farm';
+      final filterLabel = _timeRange == '24h' ? '24hours' : _timeRange == '7d' ? '7days' : '30days';
+      final fileName =
+          '${farmName}_report_${filterLabel}_${DateTime.now().millisecondsSinceEpoch}.csv';
       final file = File('${directory.path}/$fileName');
       await file.writeAsString(csv);
 
       await Share.shareXFiles(
         [XFile(file.path)],
-        subject: 'NaiHydro Dashboard Export',
+        subject: 'NaiHydro Dashboard Report - $_timeRange',
       );
 
       if (mounted) {
@@ -422,13 +448,14 @@ Future<void> _loadCurrentDataAndGenerate() async {
     final spots = _data
         .asMap()
         .entries
-        .map((e) => FlSpot(
-        e.key.toDouble(), 
-        _toDouble(e.value[field]) ?? 0.0
-    ))
+        .map((e) => FlSpot(e.key.toDouble(), _toDouble(e.value[field]) ?? 0.0))
         .toList();
 
+    final xInterval = _calculateXInterval(_data.length);
+    final yInterval = _calculateYInterval(minY, maxY);
+
     return _buildGlassCard(
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -445,44 +472,117 @@ Future<void> _loadCurrentDataAndGenerate() async {
                 style: GoogleFonts.poppins(
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
+                  fontSize: 13,
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 200,
-            child: LineChart(
-              LineChartData(
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: true,
-                  getDrawingHorizontalLine: (value) {
-                    return FlLine(
-                      color: Colors.white.withOpacity(0.1),
-                      strokeWidth: 1,
-                    );
-                  },
-                  getDrawingVerticalLine: (value) {
-                    return FlLine(
-                      color: Colors.white.withOpacity(0.1),
-                      strokeWidth: 1,
-                    );
-                  },
+            height: 220,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: LineChart(
+                LineChartData(
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: true,
+                    horizontalInterval: yInterval,
+                    verticalInterval: xInterval,
+                    getDrawingHorizontalLine: (value) {
+                      return FlLine(
+                        color: Colors.white.withOpacity(0.08),
+                        strokeWidth: 0.8,
+                      );
+                    },
+                    getDrawingVerticalLine: (value) {
+                      return FlLine(
+                        color: Colors.white.withOpacity(0.08),
+                        strokeWidth: 0.8,
+                      );
+                    },
+                  ),
+                  titlesData: FlTitlesData(
+                    show: true,
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        interval: xInterval,
+                        reservedSize: 38,
+                        getTitlesWidget: (value, meta) {
+                          final index = value.toInt();
+                          if (index < 0 || index >= _data.length) {
+                            return const SizedBox();
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 10.0),
+                            child: Text(
+                              _data[index]['time'].toString(),
+                              style: GoogleFonts.poppins(
+                                fontSize: 8.5,
+                                color: Colors.white60,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        interval: yInterval,
+                        reservedSize: 50,
+                        getTitlesWidget: (value, meta) {
+                          return Text(
+                            value.toStringAsFixed(1),
+                            style: GoogleFonts.poppins(
+                              fontSize: 8.5,
+                              color: Colors.white60,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  minY: minY,
+                  maxY: maxY,
+                  lineBarsData: [
+                    LineChartBarData(
+                      isCurved: true,
+                      color: color,
+                      spots: spots,
+                      dotData: FlDotData(
+                        show: _data.length <= 12,
+                        getDotPainter: (spot, percent, barData, index) {
+                          return FlDotCirclePainter(
+                            radius: 2.5,
+                            color: color,
+                            strokeWidth: 0,
+                          );
+                        },
+                      ),
+                      barWidth: 2.5,
+                      isStrokeCapRound: true,
+                      belowBarData: BarAreaData(
+                        show: false,
+                      ),
+                    )
+                  ],
+                  clipData: const FlClipData.all(),
+                  lineTouchData: LineTouchData(enabled: false),
                 ),
-                titlesData: FlTitlesData(show: false),
-                borderData: FlBorderData(show: false),
-                minY: minY,
-                maxY: maxY,
-                lineBarsData: [
-                  LineChartBarData(
-                    isCurved: true,
-                    color: color,
-                    spots: spots,
-                    dotData: FlDotData(show: true),
-                    barWidth: 2,
-                  )
-                ],
               ),
             ),
           )
@@ -491,31 +591,48 @@ Future<void> _loadCurrentDataAndGenerate() async {
     );
   }
 
+  double _calculateXInterval(int dataLength) {
+    if (dataLength <= 5) return 1;
+    if (dataLength <= 12) return 2;
+    if (dataLength <= 24) return 3;
+    return (dataLength / 6).ceilToDouble();
+  }
+
+  double _calculateYInterval(double minY, double maxY) {
+    final range = maxY - minY;
+    if (range < 1) return 0.1;
+    if (range < 5) return 0.5;
+    if (range < 10) return 1;
+    if (range < 50) return 5;
+    if (range < 100) return 10;
+    return (range / 5).roundToDouble();
+  }
+
   @override
   Widget build(BuildContext context) {
     List<Map<String, String>> stats = [
       {
         'title': 'Average pH',
         'value': '${_historicalMetrics['avgPh'] ?? '-'}',
-        'change': '+0.2',
+        'change': _historicalMetrics['phChange'] ?? '+0.0%',
         'trend': _historicalMetrics['phTrend'] ?? 'up'
       },
       {
-        'title': 'Avg Temperature',
+        'title': 'Average Temperature',
         'value': '${_historicalMetrics['avgTemp'] ?? '-'}°C',
-        'change': '-0.5',
+        'change': _historicalMetrics['tempChange'] ?? '+0.0%',
         'trend': _historicalMetrics['tempTrend'] ?? 'up'
       },
       {
         'title': 'Water Efficiency',
         'value': '${_historicalMetrics['waterEfficiency'] ?? '-'}%',
-        'change': '+2.1',
+        'change': _historicalMetrics['waterChange'] ?? '+0.0%',
         'trend': _historicalMetrics['waterTrend'] ?? 'up'
       },
       {
         'title': 'Growth Rate',
         'value': '${_historicalMetrics['growthRate'] ?? '-'}%',
-        'change': '+5.3',
+        'change': _historicalMetrics['nutrientChange'] ?? '+0.0%',
         'trend': _historicalMetrics['nutrientTrend'] ?? 'up'
       },
     ];
@@ -532,7 +649,6 @@ Future<void> _loadCurrentDataAndGenerate() async {
         ),
         child: Column(
           children: [
-            // Header
             Container(
               color: Colors.transparent,
               child: SafeArea(
@@ -546,7 +662,7 @@ Future<void> _loadCurrentDataAndGenerate() async {
                         onPressed: () => Navigator.of(context).pop(),
                       ),
                       Icon(Icons.bar_chart, color: kPrimaryGreen, size: 32),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           "Analytics Dashboard",
@@ -561,7 +677,7 @@ Future<void> _loadCurrentDataAndGenerate() async {
                         onPressed: _exportData,
                         icon: Icon(Icons.download, size: 18, color: kPrimaryGreen),
                         label: Text(
-                          'Export',
+                          'Report',
                           style: GoogleFonts.poppins(color: kLightText),
                         ),
                       ),
@@ -571,7 +687,6 @@ Future<void> _loadCurrentDataAndGenerate() async {
               ),
             ),
 
-            // Time Range Chips - ALWAYS VISIBLE
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
@@ -585,7 +700,7 @@ Future<void> _loadCurrentDataAndGenerate() async {
                       selected: selected,
                       onSelected: (_) => _onTimeRangeChanged(r),
                       selectedColor: kPrimaryGreen,
-                      backgroundColor: kPrimaryGreen.withOpacity(1),
+                      backgroundColor: kPrimaryGreen.withOpacity(0.5),
                       labelStyle: GoogleFonts.poppins(
                         color: selected ? Colors.white : Colors.white70,
                         fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
@@ -597,7 +712,6 @@ Future<void> _loadCurrentDataAndGenerate() async {
             ),
             const SizedBox(height: 16),
 
-            // Content
             Expanded(
               child: _isLoading
                   ? const Center(
@@ -610,7 +724,6 @@ Future<void> _loadCurrentDataAndGenerate() async {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Stats Grid
                           GridView.count(
                             crossAxisCount: 2,
                             shrinkWrap: true,
@@ -620,21 +733,50 @@ Future<void> _loadCurrentDataAndGenerate() async {
                             children: stats.map(_buildStatCard).toList(),
                           ),
 
+                          const SizedBox(height: 20),
+
+                          _buildLineChart(
+                            'pH Levels',
+                            'pH',
+                            Colors.blue[300]!,
+                            7,
+                            12.0,
+                          ),
                           const SizedBox(height: 16),
-
-                          // Charts
-                          _buildLineChart('pH Levels Over Time', 'pH', Colors.blue[300]!, 5.5, 8.0),
-                          const SizedBox(height: 12),
-                          _buildLineChart('Temperature Over Time', 'temperature', Colors.red[300]!, 15.0, 32.0),
-                          const SizedBox(height: 12),
-                          _buildLineChart('Water Level Over Time', 'waterLevel', Colors.cyan[300]!, 0, 100),
-                          const SizedBox(height: 12),
-                          _buildLineChart('Nutrient Levels Over Time', 'nutrientLevel', kAccentGreen, 400.0, 2000.0),
-                            _buildLineChart('Humidity Levels Over Time', 'humidityLevel', kAccentGreen, 400.0, 2000.0),
-
+                          _buildLineChart(
+                            'Temperature',
+                            'temperature',
+                            Colors.red[300]!,
+                            15.0,
+                            32.0,
+                          ),
                           const SizedBox(height: 16),
+                          _buildLineChart(
+                            'Water Level',
+                            'waterLevel',
+                            Colors.cyan[300]!,
+                            0.0,
+                            100.0,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildLineChart(
+                            'Nutrients',
+                            'nutrientLevel',
+                            kAccentGreen,
+                            10.0,
+                            700.0,
+                          ),
+                          const SizedBox(height: 16),
+                          _buildLineChart(
+                            'Humidity',
+                            'humidityLevel',
+                            Colors.lightBlue[300]!,
+                            30.0,
+                            90.0,
+                          ),
 
-                          // AI Insights
+                          const SizedBox(height: 20),
+
                           _buildGlassCard(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -676,7 +818,6 @@ Future<void> _loadCurrentDataAndGenerate() async {
                     ),
             ),
 
-            // Bottom Navigation
             _buildBottomNav(),
           ],
         ),
@@ -684,73 +825,73 @@ Future<void> _loadCurrentDataAndGenerate() async {
     );
   }
 
-Widget _buildBottomNav() {
-  return _buildGlassCard(
-    padding: EdgeInsets.zero,
-    child: Container(
-      decoration: BoxDecoration(
-        color: Colors.white10,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
+  Widget _buildBottomNav() {
+    return _buildGlassCard(
+      padding: EdgeInsets.zero,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white10,
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
         ),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(Icons.home, 'Home', false, () {
-                // Navigate back to farm details
-                if (widget.farm != null && widget.repository != null) {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => FarmDetailsPage(
-                        repository: widget.repository!,
-                        farm: widget.farm!,  authService: widget.authService,
-                      ),
-                    ),
-                  );
-                }
-              }),
-              _buildNavItem(Icons.notifications, 'Alerts', false, () {
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => AlertsPage(
-                      authService: widget.authService,
-                      deviceId: widget.deviceId,
-                      farm: widget.farm,
-                      repository: widget.repository,
-                    ),
-                  ),
-                );
-              }),
-              _buildNavItem(Icons.flash_on, 'Control', false, () {
-                if (widget.farm != null && widget.repository != null) {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ControlPanelPage(
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(Icons.home, 'Home', false, () {
+                  if (widget.farm != null && widget.repository != null) {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => FarmDetailsPage(
+                          repository: widget.repository!,
+                          farm: widget.farm!,
                           authService: widget.authService,
-                        farm: widget.farm!,
-                        repository: widget.repository!,
+                        ),
+                      ),
+                    );
+                  }
+                }),
+                _buildNavItem(Icons.notifications, 'Alerts', false, () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AlertsPage(
+                        authService: widget.authService,
+                        deviceId: widget.deviceId,
+                        farm: widget.farm,
+                        repository: widget.repository,
                       ),
                     ),
                   );
-                }
-              }),
-              _buildNavItem(Icons.bar_chart, 'Analytics', true, () {}),
-            ],
+                }),
+                _buildNavItem(Icons.flash_on, 'Control', false, () {
+                  if (widget.farm != null && widget.repository != null) {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ControlPanelPage(
+                          authService: widget.authService,
+                          farm: widget.farm!,
+                          repository: widget.repository!,
+                        ),
+                      ),
+                    );
+                  }
+                }),
+                _buildNavItem(Icons.bar_chart, 'Analytics', true, () {}),
+              ],
+            ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildNavItem(IconData icon, String label, bool isActive, VoidCallback onTap) {
     return InkWell(
@@ -763,7 +904,7 @@ Widget _buildBottomNav() {
             color: isActive ? kPrimaryGreen : Colors.white70,
             size: 24,
           ),
-          SizedBox(height: 4),
+          const SizedBox(height: 4),
           Text(
             label,
             style: GoogleFonts.poppins(

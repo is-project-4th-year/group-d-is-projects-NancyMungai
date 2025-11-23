@@ -1,7 +1,6 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 class NotificationService {
@@ -20,7 +19,6 @@ class NotificationService {
   bool get isInitialized => _isInitialized;
 
   Future<void> initialize(String deviceId, String userId) async {
-    // Prevent double initialization
     if (_isInitialized) {
       print('⚠️ NotificationService already initialized, skipping...');
       return;
@@ -37,74 +35,83 @@ class NotificationService {
     print('============================================================');
 
     try {
-      // 1. Request permissions first
-      await _requestPermissions();
-
-      // 2. Initialize local notifications
+      // Step 1: Initialize local notifications FIRST
+      print('\n📋 Step 1: Initializing local notifications...');
       await _initializeLocalNotifications();
 
-      // 3. Setup message handlers BEFORE getting token
-      _setupMessageHandlers();
+      // Step 2: Request permissions
+      print('\n📋 Step 2: Requesting notification permissions...');
+      await _requestPermissions();
 
-      // 4. Get FCM Token
+      // Step 3: Setup message handlers
+      print('\n🎧 Step 3: Setting up message handlers...');
+     void _setupMessageHandlers() {
+  try {
+    print('   Registering message listeners...');
+
+    // CRITICAL: Foreground message listener
+    final subscription = FirebaseMessaging.onMessage.listen(
+      (RemoteMessage message) {
+        print('\n   ✅ 🔔 FOREGROUND MESSAGE RECEIVED!');
+        print('      Title: ${message.notification?.title}');
+        print('      Body: ${message.notification?.body}');
+        
+        // Always display when app is open
+        _handleMessage(message);
+      },
+      onError: (error) {
+        print('   ❌ Error in onMessage: $error');
+      },
+    );
+
+    // Handle notification tap
+    FirebaseMessaging.onMessageOpenedApp.listen(
+      (RemoteMessage message) {
+        print('\n   👆 App opened from notification');
+        print('      Title: ${message.notification?.title}');
+      },
+      onError: (error) {
+        print('   ❌ Error in onMessageOpenedApp: $error');
+      },
+    );
+    
+    print('   ✅ Message handlers registered');
+  } catch (e) {
+    print('   ❌ Error setting up handlers: $e');
+  }
+}
+
+      // Step 4: Get FCM Token
+      print('\n🎫 Step 4: Getting FCM token...');
       String? fcmToken = await _firebaseMessaging.getToken();
       
-      if (fcmToken != null) {
-        print('🎫 FCM Token obtained');
+      if (fcmToken != null && fcmToken.isNotEmpty) {
+        print('✅ FCM Token obtained: ${fcmToken.substring(0, 20)}...');
         print('   Device ID: $deviceId');
-        print('   FCM Token: ${fcmToken.substring(0, 20)}...');
         print('   User ID: $userId');
-        
-        // Save FCM token to Firebase
         await _saveFcmTokenDirectly(deviceId, userId, fcmToken);
       } else {
         print('❌ Failed to get FCM token');
       }
 
-      // 5. Listen to token refresh
+      // Step 5: Listen to token refresh
+      print('\n🔄 Step 5: Listening to FCM token refresh...');
       _listenToTokenRefresh(deviceId, userId);
 
       _isInitialized = true;
-      print('✅ Notification Service initialized successfully');
-      print('============================================================');
+      print('\n✅ Notification Service initialized successfully');
+      print('============================================================\n');
     } catch (e) {
       print('❌ Error during initialization: $e');
       print('Stack trace: ${StackTrace.current}');
     }
   }
 
-  Future<void> _requestPermissions() async {
-    print('\n📋 Requesting notification permissions...');
-    
-    try {
-      final settings = await _firebaseMessaging.requestPermission(
-        alert: true,
-        announcement: false,
-        badge: true,
-        criticalAlert: false,
-        provisional: false,
-        sound: true,
-      );
-
-      print('✅ Permission status: ${settings.authorizationStatus}');
-      
-      if (settings.authorizationStatus == AuthorizationStatus.denied) {
-        print('⚠️ User denied notification permissions');
-      }
-    } catch (e) {
-      print('❌ Error requesting permissions: $e');
-    }
-  }
-
   Future<void> _initializeLocalNotifications() async {
-    print('\n🔧 Initializing local notifications...');
-    
     try {
-      // Android setup
       const AndroidInitializationSettings androidInit =
           AndroidInitializationSettings('@mipmap/ic_launcher');
       
-      // iOS setup
       const DarwinInitializationSettings iosInit = DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
@@ -123,18 +130,14 @@ class NotificationService {
         },
       );
       
-      // Create notification channel for Android
       await _createNotificationChannel();
-      
-      print('✅ Local notifications initialized');
+      print('   ✅ Local notifications initialized');
     } catch (e) {
-      print('❌ Error initializing local notifications: $e');
+      print('   ❌ Error initializing local notifications: $e');
     }
   }
 
   Future<void> _createNotificationChannel() async {
-    print('   Creating Android notification channel...');
-    
     try {
       const AndroidNotificationChannel channel = AndroidNotificationChannel(
         'naihydro_alerts',
@@ -146,69 +149,64 @@ class NotificationService {
         showBadge: true,
       );
 
-      await _localNotifications
+      final androidPlugin = _localNotifications
           .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(channel);
-      
-      print('   ✅ Notification channel created');
+              AndroidFlutterLocalNotificationsPlugin>();
+
+      if (androidPlugin != null) {
+        await androidPlugin.createNotificationChannel(channel);
+        print('   ✅ Android channel created: naihydro_alerts');
+      }
     } catch (e) {
       print('   ⚠️ Error creating channel: $e');
     }
   }
 
-  Future<void> _saveFcmTokenDirectly(
-    String deviceId,
-    String userId,
-    String fcmToken,
-  ) async {
+  Future<void> _requestPermissions() async {
     try {
-      print('\n💾 Saving FCM token to Firebase...');
-
-      // Save to device path
-      await _database.ref('devices/$deviceId/fcmToken').set(fcmToken);
-      print('   ✅ Saved to /devices/$deviceId/fcmToken');
-
-      // Save to user's device mapping
-      await _database.ref('users/$userId/devices/$deviceId/fcmToken').set(fcmToken);
-      print('   ✅ Saved to /users/$userId/devices/$deviceId/fcmToken');
-
-      // Update timestamp
-      await _database.ref('devices/$deviceId/fcmTokenUpdated').set(
-        DateTime.now().toIso8601String()
+      final settings = await _firebaseMessaging.requestPermission(
+        alert: true,
+        announcement: true,
+        badge: true,
+        criticalAlert: false,
+        provisional: false,
+        sound: true,
       );
+
+      print('   ✅ Permission status: ${settings.authorizationStatus}');
       
-      print('   ✅ FCM token saved successfully');
+      if (settings.authorizationStatus == AuthorizationStatus.denied) {
+        print('   ⚠️ Notifications were denied');
+      }
     } catch (e) {
-      print('   ❌ Error saving FCM token: $e');
+      print('   ❌ Error requesting permissions: $e');
     }
   }
 
   void _setupMessageHandlers() {
-    print('\n🎧 Setting up message handlers...');
-    
     try {
-      // Handle background messages
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-      print('   ✅ Background handler registered');
+      print('   Registering foreground message listener...');
 
-      // Handle FOREGROUND messages
+      // This is the KEY handler for when app is open
       FirebaseMessaging.onMessage.listen(
         (RemoteMessage message) {
-          print('\n   🔔 FOREGROUND MESSAGE RECEIVED');
+          print('\n   ✅ 🔔 FOREGROUND MESSAGE RECEIVED!');
           print('      Title: ${message.notification?.title}');
           print('      Body: ${message.notification?.body}');
+          print('      Has notification: ${message.notification != null}');
+          print('      Data keys: ${message.data.keys}');
+          
           _handleMessage(message);
         },
         onError: (error) {
-          print('   ❌ Error in onMessage: $error');
+          print('   ❌ Error in onMessage listener: $error');
         },
       );
 
-      // Handle notification tap
+      // Handle when user taps notification
       FirebaseMessaging.onMessageOpenedApp.listen(
         (RemoteMessage message) {
-          print('\n   👆 App opened from notification');
+          print('\n   👆 App opened/resumed from notification tap');
           print('      Title: ${message.notification?.title}');
         },
         onError: (error) {
@@ -223,11 +221,9 @@ class NotificationService {
   }
 
   void _listenToTokenRefresh(String deviceId, String userId) {
-    print('\n🔄 Listening to FCM token refresh...');
-    
     _firebaseMessaging.onTokenRefresh.listen(
       (String newToken) {
-        print('🔔 FCM Token REFRESHED');
+        print('\n🔔 FCM Token REFRESHED');
         print('   New token: ${newToken.substring(0, 30)}...');
         _saveFcmTokenDirectly(deviceId, userId, newToken);
       },
@@ -237,25 +233,50 @@ class NotificationService {
     );
   }
 
+  Future<void> _saveFcmTokenDirectly(
+    String deviceId,
+    String userId,
+    String fcmToken,
+  ) async {
+    try {
+      print('   💾 Saving FCM token to Firebase...');
+
+      await _database.ref('devices/$deviceId/fcmToken').set(fcmToken);
+      print('      ✅ Saved to /devices/$deviceId/fcmToken');
+
+      await _database.ref('users/$userId/devices/$deviceId/fcmToken').set(fcmToken);
+      print('      ✅ Saved to /users/$userId/devices/$deviceId/fcmToken');
+
+      await _database.ref('devices/$deviceId/fcmTokenUpdated').set(
+        DateTime.now().toIso8601String(),
+      );
+      
+      print('   ✅ FCM token saved successfully');
+    } catch (e) {
+      print('   ❌ Error saving FCM token: $e');
+    }
+  }
+
   void _handleMessage(RemoteMessage message) {
     try {
-      print('\n🔄 Processing message...');
+      print('\n🔄 Processing message for display...');
       
-      if (message.notification != null) {
-        _showNotification(
-          message.notification!.title ?? 'Alert',
-          message.notification!.body ?? 'New notification',
-          message.data['type'] ?? 'unknown',
-        );
-      } else if (message.data.isNotEmpty) {
-        _showNotification(
-          message.data['title'] ?? 'Alert',
-          message.data['body'] ?? 'New notification',
-          message.data['type'] ?? 'unknown',
-        );
-      }
+      final title = message.notification?.title ?? 
+                    message.data['title'] ?? 
+                    'Alert';
+      final body = message.notification?.body ?? 
+                   message.data['body'] ?? 
+                   'New notification';
+      final type = message.data['type'] ?? 'unknown';
+
+      print('   Title: $title');
+      print('   Body: $body');
+      print('   Type: $type');
+
+      _showNotification(title, body, type);
     } catch (e) {
       print('❌ Error handling message: $e');
+      print('Stack: ${StackTrace.current}');
     }
   }
 
@@ -265,10 +286,7 @@ class NotificationService {
     String tag,
   ) async {
     try {
-      print('\n📲 Showing notification...');
-      print('   Title: $title');
-      print('   Body: $body');
-      print('   Tag: $tag');
+      print('   📲 Displaying local notification...');
       
       const AndroidNotificationDetails androidDetails =
           AndroidNotificationDetails(
@@ -296,7 +314,6 @@ class NotificationService {
         iOS: iosDetails,
       );
 
-      // Use unique ID based on timestamp
       final notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
 
       await _localNotifications.show(
@@ -307,23 +324,9 @@ class NotificationService {
         payload: tag,
       );
 
-      print('   ✅ Notification displayed successfully');
+      print('   ✅ Notification displayed');
     } catch (e) {
       print('   ❌ Error showing notification: $e');
-      print('   Exception: ${e.runtimeType}');
     }
   }
 }
-
-/// Background message handler (top-level function)
-@pragma('vm:entry-point')
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  print('\n🔔 BACKGROUND MESSAGE RECEIVED');
-  print('   Title: ${message.notification?.title}');
-  print('   Body: ${message.notification?.body}');
-  
-  // Initialize Firebase if needed
-  await Firebase.initializeApp();
-}
-
-// Add this import at the top
