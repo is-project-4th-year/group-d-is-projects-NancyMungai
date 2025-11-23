@@ -74,127 +74,261 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _openEditFarm(FarmModel farm) {
-    final nameCtrl = TextEditingController(text: farm.name);
-    final locationCtrl = TextEditingController(text: farm.location);
-    String selectedCrop = farm.cropType ?? 'Lettuce';
+void _openEditFarm(FarmModel farm) {
+  final nameCtrl = TextEditingController(text: farm.name);
+  final locationCtrl = TextEditingController(text: farm.location);
+  String selectedCrop = farm.cropType ?? 'Lettuce';
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: kBackgroundColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Edit Farm',
-          style: GoogleFonts.poppins(
-            fontWeight: FontWeight.bold,
-            color: kDarkText,
-          ),
+  showDialog(
+    context: context,
+    builder: (context) => Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      insetPadding: const EdgeInsets.all(16),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              style: GoogleFonts.poppins(color: kDarkText),
-              decoration: InputDecoration(
-                labelText: 'Farm Name',
-                labelStyle: GoogleFonts.poppins(color: kDarkText.withOpacity(0.7)),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: locationCtrl,
-              style: GoogleFonts.poppins(color: kDarkText),
-              decoration: InputDecoration(
-                labelText: 'Location',
-                labelStyle: GoogleFonts.poppins(color: kDarkText.withOpacity(0.7)),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-            ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              value: selectedCrop,
-              style: GoogleFonts.poppins(color: kDarkText),
-              decoration: InputDecoration(
-                labelText: 'Crop Type',
-                labelStyle: GoogleFonts.poppins(color: kDarkText.withOpacity(0.7)),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              items: ['Lettuce', 'Tomatoes', 'Herbs', 'Spinach', 'Kale']
-                  .map((crop) => DropdownMenuItem(value: crop, child: Text(crop)))
-                  .toList(),
-              onChanged: (value) {
-                if (value != null) selectedCrop = value;
-              },
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: GoogleFonts.poppins(color: kDarkText)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                final uid = widget.authService.currentUser?.uid;
-                if (uid != null) {
-                  await _database.ref('users/$uid/farms/${farm.id}').update({
-                    'name': nameCtrl.text.trim(),
-                    'location': locationCtrl.text.trim(),
-                    'cropType': selectedCrop,
-                  });
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Farm updated successfully'),
-                      backgroundColor: kPrimaryGreen,
-                    ),
-                  );
-                }
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error updating farm: $e'),
-                    backgroundColor: Colors.red,
+        child: _buildGlassCard(
+          padding: const EdgeInsets.all(20),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Title
+                Text(
+                  'Edit Farm Details',
+                  style: GoogleFonts.poppins(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20,
+                    color: kLightText,
                   ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: kPrimaryGreen),
-            child: Text('Save', style: GoogleFonts.poppins(color: kLightText)),
-          ),
-        ],
-      ),
-    );
-  }
+                ),
+                const SizedBox(height: 20),
 
-  void _deleteFarm(FarmModel farm) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: kBackgroundColor.withOpacity(0.9),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Delete Farm',
-          style: GoogleFonts.poppins(
-            fontWeight: FontWeight.bold,
-            color: Colors.red[600],
+                // Farm Name Input
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: TextField(
+                    controller: nameCtrl,
+                    style: GoogleFonts.poppins(
+                      color: kLightText,
+                      fontSize: 14,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'Farm Name',
+                      labelStyle: GoogleFonts.poppins(
+                        color: kLightText.withOpacity(0.6),
+                        fontSize: 12,
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.all(14),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Location Input
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: TextField(
+                    controller: locationCtrl,
+                    style: GoogleFonts.poppins(
+                      color: kLightText,
+                      fontSize: 14,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'Location',
+                      labelStyle: GoogleFonts.poppins(
+                        color: kLightText.withOpacity(0.6),
+                        fontSize: 12,
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.all(14),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Crop Type Dropdown
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.2),
+                      width: 1,
+                    ),
+                  ),
+                  child: DropdownButtonFormField<String>(
+                    value: selectedCrop,
+                    style: GoogleFonts.poppins(
+                      color: kLightText,
+                      fontSize: 14,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: 'Crop Type',
+                      labelStyle: GoogleFonts.poppins(
+                        color: kLightText.withOpacity(0.6),
+                        fontSize: 12,
+                      ),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.all(14),
+                    ),
+                    dropdownColor: kBackgroundColor,
+                    items: ['Lettuce', 'Tomatoes', 'Herbs', 'Spinach', 'Kale']
+                        .map((crop) => DropdownMenuItem(
+                          value: crop,
+                          child: Text(crop),
+                        ))
+                        .toList(),
+                    onChanged: (value) {
+                      if (value != null) selectedCrop = value;
+                    },
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Action Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.grey.withOpacity(0.3),
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: GoogleFonts.poppins(
+                            color: kLightText,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          try {
+                            final uid = widget.authService.currentUser?.uid;
+                            if (uid != null) {
+                              await _database.ref('users/$uid/farms/${farm.id}').update({
+                                'name': nameCtrl.text.trim(),
+                                'location': locationCtrl.text.trim(),
+                                'cropType': selectedCrop,
+                              });
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text('Farm updated successfully'),
+                                  backgroundColor: kPrimaryGreen,
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Error updating farm: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: kPrimaryGreen,
+                          padding: const EdgeInsets.symmetric(vertical: 11),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: Text(
+                          'Save',
+                          style: GoogleFonts.poppins(
+                            color: kLightText,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
-        content: Column(
+      ),
+    ),
+  );
+}
+
+void _deleteFarm(FarmModel farm) {
+  showDialog(
+    context: context,
+    builder: (context) => Dialog(
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      child: _buildGlassCard(
+        padding: const EdgeInsets.all(24),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.warning_rounded, color: Colors.red[600], size: 48),
-            const SizedBox(height: 16),
+            // Warning icon at top
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(50),
+              ),
+              child: Icon(
+                Icons.warning_rounded,
+                color: Colors.red[600],
+                size: 48,
+              ),
+            ),
+            const SizedBox(height: 20),
+            
+            // Title
+            Text(
+              'Delete Farm',
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.bold,
+                fontSize: 20,
+                color: Colors.red[600],
+              ),
+            ),
+            const SizedBox(height: 12),
+            
+            // Message
             Text(
               'Are you sure you want to delete "${farm.name}"?',
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
                 fontWeight: FontWeight.w500,
-                color: kDarkText,
+                fontSize: 14,
+                color: kLightText,
               ),
             ),
             const SizedBox(height: 8),
@@ -203,47 +337,83 @@ class _HomePageState extends State<HomePage> {
               textAlign: TextAlign.center,
               style: GoogleFonts.poppins(
                 fontSize: 12,
-                color: Colors.red[600],
+                color: Colors.red[300],
               ),
+            ),
+            const SizedBox(height: 24),
+            
+            // Action buttons
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey.withOpacity(0.3),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text(
+                      'Cancel',
+                      style: GoogleFonts.poppins(
+                        color: kLightText,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      try {
+                        final uid = widget.authService.currentUser?.uid;
+                        if (uid != null) {
+                          await _database.ref('users/$uid/farms/${farm.id}').remove();
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text('Farm deleted successfully'),
+                              backgroundColor: Colors.red[600],
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        Navigator.pop(context);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Error deleting farm: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red[600],
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: Text(
+                      'Delete',
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: GoogleFonts.poppins(color: kPrimaryGreen)),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                final uid = widget.authService.currentUser?.uid;
-                if (uid != null) {
-                  await _database.ref('users/$uid/farms/${farm.id}').remove();
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Farm deleted successfully'),
-                      backgroundColor: Colors.red[600],
-                    ),
-                  );
-                }
-              } catch (e) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error deleting farm: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red[600]),
-            child: Text('Delete', style: GoogleFonts.poppins(color: Colors.white)),
-          ),
-        ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildGlassCard({required Widget child, EdgeInsetsGeometry? padding}) {
     return ClipRRect(

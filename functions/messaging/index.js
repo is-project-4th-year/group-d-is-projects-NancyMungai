@@ -200,20 +200,20 @@ function checkThresholds(sensorReadings, mlPrediction) {
   const temp = parseVal(sensorReadings.DHT_temp);
   const humidity = parseVal(sensorReadings.DHT_humidity);
 
-  console.log(`      Water: ${waterLevel}L, TDS: ${tds}ppm, pH: ${ph}, Temp: ${temp}°C, Humidity: ${humidity}%`);
+  console.log(`      Water: ${waterLevel}cm, TDS: ${tds}ppm, pH: ${ph}, Temp: ${temp}°C, Humidity: ${humidity}%`);
 
   // ========== CRITICAL WATER LEVEL ==========
   if (waterLevel > 0 && waterLevel < 10) {
     alerts.push({
       type: "water_critical",
       title: "🚨 CRITICAL: Tank Almost Empty",
-      body: `Water level: ${waterLevel.toFixed(1)}L - Refill immediately!`,
+      body: `Water level: ${waterLevel.toFixed(1)}cm - Refill immediately!`,
     });
   } else if (waterLevel > 0 && waterLevel < 20) {
     alerts.push({
       type: "water_low",
       title: "⚠️ Water Level Low",
-      body: `Water level: ${waterLevel.toFixed(1)}L - Refill soon`,
+      body: `Water level: ${waterLevel.toFixed(1)}cm - Refill soon`,
     });
   }
 
