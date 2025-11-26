@@ -10,6 +10,7 @@ import '../presentation/data/farm_repository.dart';
 import '../presentation/models/farm_model.dart';
 import 'add_farm_page.dart';
 import 'farm_details_page.dart';
+import 'package:naihydro/src/features/auth/presentation/chat_page.dart';
 
 const Color kPrimaryGreen = Color(0xFF558B2F);
 const Color kAccentGreen = Color(0xFF8BC34A);
@@ -33,6 +34,7 @@ class _HomePageState extends State<HomePage> {
   late final Stream<List<FarmModel>> _farmsStream;
   String _userName = 'User';
   final _database = FirebaseDatabase.instance;
+  bool _isChatOpen = false;
 
   @override
   void initState() {
@@ -73,6 +75,43 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+  Widget _buildChatButton() {
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(16),
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+      child: Container(
+        width: 60,
+        height: 60,
+        decoration: BoxDecoration(
+          color: kCardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.3),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: kAccentGreen.withOpacity(0.3),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            ),
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 10,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Icon(
+          Icons.chat,
+          color: kAccentGreen,
+          size: 28,
+        ),
+      ),
+    ),
+  );
+}
 
 void _openEditFarm(FarmModel farm) {
   final nameCtrl = TextEditingController(text: farm.name);
@@ -697,9 +736,11 @@ void _deleteFarm(FarmModel farm) {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Container(
+ return Scaffold(
+  backgroundColor: Colors.transparent,
+  body: Stack(
+    children: [
+      Container(
         decoration: BoxDecoration(
           color: kBackgroundColor,
           image: const DecorationImage(
@@ -789,6 +830,22 @@ void _deleteFarm(FarmModel farm) {
           ],
         ),
       ),
-    );
+      // Chat Button in Bottom Right
+      Positioned(
+        bottom: 24,
+        right: 24,
+        child: GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ChatPage()),
+            );
+          },
+          child: _buildChatButton(),
+        ),
+      ),
+    ],
+  ),
+);
   }
 }
