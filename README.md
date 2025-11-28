@@ -596,7 +596,7 @@ naihydro/
 ## Support & Documentation
 
 **Documentation** Refer to the /documentation/ directory for detailed guides
-**Repository:** [GitHub - Naihydro](https://github.com/is-project-4th-year/group-d-is-projects-NancyMungai.git)
+
 **Video Demo link:** [IoT hydroponic Farm Demo](https://drive.google.com/file/d/1jXXJsbiIpIG8s7e_L_UreRGYxWzlisUB/view?usp=sharing)
 ## Acknowledgments
 This project was developed as part of a Bachelor of Science degree in Informatics and Computer Science at Strathmore University. Special thanks to contributors who made this work possible.
