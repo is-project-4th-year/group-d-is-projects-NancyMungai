@@ -516,8 +516,6 @@ Report includes:
 
 ```
 naihydro/
-├── esp32_firmware/
-│   └── hydroponic_monitoring.ino      # Main ESP32 code
 │
 ├── lib/src/
 │   ├── features/
