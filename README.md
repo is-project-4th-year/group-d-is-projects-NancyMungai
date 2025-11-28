@@ -1,4 +1,4 @@
-# Naihydro: Smart Hydroponic Monitoring System
+ # Naihydro: Smart Hydroponic Monitoring System
 ## A mobile Application for Environment Condition Monitoring in IoT-Enabled Hydroponic Farms for Lettuce Using Random Forest and XGBoost
 
 A comprehensive IoT and machine learning solution for real-time monitoring and anomaly detection in hydroponic lettuce farming.
@@ -197,13 +197,6 @@ FIREBASE_PRIVATE_KEY=your_private_key_json_path
 GOOGLE_APPLICATION_CREDENTIALS=path_to_service_account.json
 ```
 
-#### Start Backend Server
-```bash
-python app.py
-```
-
-The server will run on `http://localhost:5000`
-
 ### 5. Flutter Mobile App Setup
 
 #### Install Flutter Dependencies
@@ -218,15 +211,10 @@ flutter pub get
 
 #### Run Mobile App
 ```bash
+flutter clean
+flutter pub get
 flutter run
 ```
-
-Or run on a specific device:
-```bash
-flutter run -d <device_id>
-```
-
----
 
 ## Hardware Setup
 
@@ -247,17 +235,17 @@ flutter run -d <device_id>
 ### Step 2: Assemble the Hydroponic Container
 
 1. **Prepare Container**
-   - Use a 1–5 liter nutrient solution plastic container
+   - Use a 500-1000 ml nutrient solution plastic container
    - Drill holes for sensor placement and cables
 
 2. **Install Sensors**
    - Place pH sensor and TDS sensor submerged in nutrient solution
-   - Position HC-SR04 ultrasonic sensor above water (5–15 cm distance)
+   - Position HC-SR04 ultrasonic sensor above water (ensure no contact with the water)
    - Mount DHT22 in growing area (not in water)
 
 3. **Connect Water Pump**
    - Place submersible pump inside container
-   - Connect pump output to water tubing/drip system
+   - Connect pump output to 1m long pipe/ tubing
    - Connect pump electrical cable to relay module
 
 4. **Power Connection**
@@ -282,70 +270,33 @@ flutter run -d <device_id>
 2. Record HC-SR04 distance measurements
 3. Verify ultrasonic sensor accuracy (±1 cm tolerance)
 
-### Step 4: Power On and Test
-
-1. **Power ESP32**
-   ```
-   - Connect USB cable
-   - ESP32 LED should light up
-   - Check Serial Monitor for connection status
-   ```
-
-2. **Verify WiFi Connection**
-   ```
-   Serial output should show:
-   "Connected WiFi"
-   "Connected to Firebase"
-   ```
-
-3. **Check Firebase Data**
-   - Go to Firebase Console
-   - Navigate to **Realtime Database**
-   - Check `/devices/esp32-001/latest` for sensor readings
-   - Data should update every 10 seconds
-
-4. **Test Relay & Pump**
-   - From Serial Monitor, send: `PUMP_ON`
-   - Relay should click and pump should activate
-   - Send: `PUMP_OFF` to stop pump
-
----
-
 ## Getting Started
 
 ### First-Time App Setup
 
 #### 1. Launch the App
-- Install and open Naihydro on your Android device
-- You will see the **Login Page**
+- Flutter run and open Naihydro on your Android device
+- You will see the **Landing Page**
 
 #### 2. Create Account
-- Tap **Sign Up**
-- Enter your email and password
-- Tap **Register**
-- Verify your email (check spam folder)
+- Tap **Get Started**
+- Fill in sign up form with personal details
+- Tap **Create Account**
 
 #### 3. Add a Farm
 - After login, tap **Add Farm** button
 - Enter farm details:
   - **Farm Name:** e.g., "Home Lettuce Farm"
   - **Location:** Your farm location
+  - **Device ID:** Link you ESP32 microcontroller device "e.g esp32-001"
   - **Crop Type:** Select "Lettuce"
-- Tap **Save**
+- Tap **Save Farm**
 
-#### 4. Connect ESP32 Device
-- Tap **Add Device**
-- Enter Device ID: `esp32-001` (must match ESP32 firmware)
-- Select your farm from dropdown
-- Tap **Connect**
-- Wait for device status to show "Online"
-
----
 
 ## Using the Mobile App
 
 ### Dashboard View
-**Location:** Home screen after login
+**Location:** Home screen after tapping on Farm
 
 **Displays:**
 - Real-time sensor readings:
@@ -358,7 +309,7 @@ flutter run -d <device_id>
 - **Status Indicator:**
   - 🟢 Green = All parameters optimal
   - 🟡 Yellow = Approaching warning threshold
-  - 🔴 Red = Anomaly detected
+  - 🔴 Red = Anomaly detected/ Critical conditions
 
 ### Viewing Historical Data
 
@@ -370,6 +321,16 @@ flutter run -d <device_id>
    - pH stability
    - TDS concentration changes
    - Water level history
+     
+### Exporting Reports
+
+1. Tap **Reports** tab
+2. Select time range
+3. Tap **Download icon**
+4. Tap **Download** or **Share**
+
+Report includes:
+- Summary statistics for all sensor readings plus timestamp
 
 ### Receiving Alerts
 
@@ -382,62 +343,23 @@ flutter run -d <device_id>
 3. Tap notification to view details
 4. Alert history available in **Alerts** section
 
-**Alert Examples:**
-- "pH too high (8.2) - Add pH down nutrient"
-- "TDS low (300 ppm) - Increase nutrient concentration"
-- "Temperature low (12°C) - Check heater"
-- "Water level critical - Refill tank"
-
 ### Controlling the Water Pump
 
 #### Manual Control
-1. Tap **Control Panel** tab
+1. Tap **Control Panel** tab on bottom notifaction bar
 2. Locate **Pump Control** section
 3. **Toggle to ON** - Pump starts immediately
 4. **Toggle to OFF** - Pump stops
 
-**Status Display:**
-```
-Pump Status: RUNNING ● (or STOPPED ●)
-Current Runtime: 5 minutes
-Last Command: 2 minutes ago
-```
-
-#### Auto-Control
-- The system automatically activates pump when water level drops below threshold
-- Pump automatically stops when water level reaches optimal
-
-### Farm Settings
-
-1. Tap **Settings** icon
-2. Adjust alert thresholds:
-   - pH Range (default: 6.0–7.5)
-   - TDS Range (default: 500–1200 ppm)
-   - Temperature Range (default: 16–25°C)
-   - Water Level Alert (default: <5 cm)
-3. Tap **Save Changes**
-
-### Exporting Reports
-
-1. Tap **Reports** tab
-2. Select date range
-3. Tap **Generate Report**
-4. Tap **Download** or **Share**
-
-Report includes:
-- Summary statistics
-- Historical graphs
-- Anomaly log
-- Recommendations
-
 ### Chat Assistance
 
-1. Tap **Chat** icon (bottom right)
-2. Ask questions like:
+1.  Ensure npm server is running(cd  naihydro-chat-backend, npm start)
+2.  Tap **Chat** icon (bottom right) in home page.
+3. Ask questions like:
    - "What should my pH be?"
    - "Why is my TDS low?"
    - "How often should I water?"
-3. Chatbot provides instant guidance
+4. Chatbot provides instant guidance
 
 ---
 
@@ -486,12 +408,12 @@ Report includes:
 **TDS Sensor:**
 - Clean electrode with distilled water
 - Verify sensor is fully submerged
-- Recalibrate against known solution
+- Recalibrate against the known solution
 
 **DHT22:**
 - Ensure not exposed to direct water spray
-- Check if condensation present
-- May need replacement if readings stuck
+- Check if condensation is present
+- May need replacement if readings are stuck
 
 **HC-SR04:**
 - Clean sensor lens
@@ -571,25 +493,6 @@ naihydro/
 ├── pubspec.yaml                       # Flutter dependencies
 └── README.md                          # This file
 ```
-
----
-
-## System Requirements Summary
-
-### Minimal Setup
-- ESP32 microcontroller
-- 2–3 sensors (pH, temperature, water level)
-- Android phone with WiFi
-- Firebase free tier account
-
-### Full Production Setup
-- ESP32 with all 5 sensors
-- Stable power supply (5V/2A minimum)
-- WiFi with ≥10 Mbps
-- Backend server running
-- Firebase Blaze plan (for heavy ML processing)
-
----
 
 ## Support & Documentation
 
